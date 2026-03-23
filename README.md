@@ -42,7 +42,7 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-username/traffic-source.git
+git clone https://github.com/mddanishyusuf/traffic-source.git
 cd traffic-source
 npm install
 ```
