@@ -37,7 +37,7 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 
 No VPS setup needed — deploy in one click and you're live in under a minute.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/traffic-source)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/traffic-source)
 
 ### Option 2: Self-host on a VPS
 
