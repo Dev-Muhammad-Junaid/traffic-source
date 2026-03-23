@@ -33,13 +33,21 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: One-click deploy on Railway
+
+No VPS setup needed — deploy in one click and you're live in under a minute.
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/traffic-source)
+
+### Option 2: Self-host on a VPS
+
+#### Prerequisites
 
 - Node.js 20+
 - A VPS ($4/mo on Hetzner or $6/mo on DigitalOcean works great)
 - Cloudflare account (free tier) for geo data + CDN
 
-### 1. Clone and install
+#### 1. Clone and install
 
 ```bash
 git clone https://github.com/mddanishyusuf/traffic-source.git
@@ -47,7 +55,7 @@ cd traffic-source
 npm install
 ```
 
-### 2. Configure environment
+#### 2. Configure environment
 
 ```bash
 cp .env.local .env.production
@@ -68,7 +76,7 @@ Generate a secure JWT secret:
 openssl rand -hex 32
 ```
 
-### 3. Build and run
+#### 3. Build and run
 
 ```bash
 npm run build
@@ -77,14 +85,14 @@ npm start
 
 The app runs on port 3000 by default.
 
-### 4. Set up Cloudflare proxy
+#### 4. Set up Cloudflare proxy
 
 1. Add your domain to Cloudflare (free plan)
 2. Point DNS A record to your VPS IP
 3. Enable the orange cloud (proxy) toggle
 4. Done — Cloudflare will now send `cf-ipcountry` and `cf-ipcity` headers automatically
 
-### 5. First login
+#### 5. First login
 
 Visit your domain and register. Only the first user can register — after that, registration is disabled.
 
