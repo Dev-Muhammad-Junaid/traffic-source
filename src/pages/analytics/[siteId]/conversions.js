@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ConversionJourneyTable from '@/components/ui/ConversionJourneyTable';
+import FunnelView from '@/components/ui/FunnelView';
 import { useDateRange } from '@/contexts/DateRangeContext';
 
 export default function Conversions() {
@@ -13,6 +14,7 @@ export default function Conversions() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState('journey');
 
   const fetchData = useCallback(async () => {
     if (!siteId) return;
@@ -63,40 +65,49 @@ export default function Conversions() {
         <div className="panel" style={{ marginBottom: 20 }}>
           <div className="panel-header">
             <div className="panel-tabs">
-              <button className="panel-tab active">
+              <button
+                className={`panel-tab ${activeTab === 'journey' ? 'active' : ''}`}
+                onClick={() => setActiveTab('journey')}
+              >
                 Journey for payment
               </button>
-              <button className="panel-tab" disabled>
+              <button
+                className={`panel-tab ${activeTab === 'funnel' ? 'active' : ''}`}
+                onClick={() => setActiveTab('funnel')}
+              >
                 Funnel
               </button>
-              <button className="panel-tab" disabled>
-                User
-              </button>
             </div>
 
-            <div className="search-input-wrap">
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="search-input"
-              />
-            </div>
-          </div>
-
-          <div className="panel-body" style={{ padding: 0 }}>
-            {loading ? (
-              <div className="loading-inline"><div className="loading-spinner" /></div>
-            ) : (
-              <ConversionJourneyTable
-                conversions={data?.conversions || []}
-                siteId={siteId}
-              />
+            {activeTab === 'journey' && (
+              <div className="search-input-wrap">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="search-input"
+                />
+              </div>
             )}
           </div>
 
-          {data?.pagination && data.pagination.totalPages > 1 && (
+          <div className="panel-body" style={{ padding: 0 }}>
+            {activeTab === 'journey' ? (
+              loading ? (
+                <div className="loading-inline"><div className="loading-spinner" /></div>
+              ) : (
+                <ConversionJourneyTable
+                  conversions={data?.conversions || []}
+                  siteId={siteId}
+                />
+              )
+            ) : (
+              <FunnelView siteId={siteId} />
+            )}
+          </div>
+
+          {activeTab === 'journey' && data?.pagination && data.pagination.totalPages > 1 && (
             <div className="pagination">
               <button
                 className="btn btn-secondary btn-sm"

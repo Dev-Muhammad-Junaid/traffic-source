@@ -16,7 +16,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/.next"
 TEMP_BUILD_DIR="$PROJECT_DIR/.next-temp"
 BACKUP_BUILD_DIR="$PROJECT_DIR/.next-backup"
-PM2_PROCESS="trafficsource"
+PM2_PROCESS="traffic-source"
 
 echo -e "${YELLOW}Starting zero-downtime deployment...${NC}"
 echo "Project directory: $PROJECT_DIR"
