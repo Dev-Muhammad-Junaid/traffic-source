@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDateRange } from '@/contexts/DateRangeContext';
 
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 56;
-const COL_GAP = 80;
-const ROW_GAP = 16;
+const NODE_WIDTH = 160;
+const NODE_HEIGHT = 40;
+const COL_GAP = 56;
+const ROW_GAP = 10;
 
 /**
  * Flatten a tree into positioned nodes laid out in columns by depth.
@@ -174,7 +174,7 @@ export default function FlowView({ siteId }) {
               const y2 = tgt.y + NODE_HEIGHT / 2;
               const cx = (x1 + x2) / 2;
               const d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
-              const strokeW = Math.max(1.5, (l.value / maxVisitors) * 18);
+              const strokeW = Math.max(1, (l.value / maxVisitors) * 12);
               const isHi = highlighted.has(l.source) && highlighted.has(l.target);
               const dim = hoverId !== null && !isHi;
               return (
@@ -207,22 +207,22 @@ export default function FlowView({ siteId }) {
                   <rect
                     width={NODE_WIDTH}
                     height={NODE_HEIGHT}
-                    rx={6}
+                    rx={5}
                     fill="var(--bg-card)"
                     stroke={isHi ? 'var(--accent)' : 'var(--border)'}
-                    strokeWidth={isHi ? 1.5 : 1}
+                    strokeWidth={isHi ? 1.25 : 1}
                   />
                   {/* fill bar */}
                   <rect
                     x={0}
-                    y={NODE_HEIGHT - 3}
+                    y={NODE_HEIGHT - 2}
                     width={(NODE_WIDTH * widthPct) / 100}
-                    height={3}
-                    rx={1.5}
+                    height={2}
+                    rx={1}
                     fill="var(--accent)"
                     opacity={0.6}
                   />
-                  <foreignObject x={10} y={6} width={NODE_WIDTH - 20} height={NODE_HEIGHT - 12}>
+                  <foreignObject x={8} y={4} width={NODE_WIDTH - 16} height={NODE_HEIGHT - 8}>
                     <div className="flow-node-content">
                       <div className="flow-node-path" title={n.pathname}>{n.pathname}</div>
                       <div className="flow-node-visitors">
