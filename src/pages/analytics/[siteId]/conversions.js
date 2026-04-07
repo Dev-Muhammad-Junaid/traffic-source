@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ConversionJourneyTable from '@/components/ui/ConversionJourneyTable';
-import FunnelView from '@/components/ui/FunnelView';
+import FlowView from '@/components/ui/FlowView';
 import { useDateRange } from '@/contexts/DateRangeContext';
 
 export default function Conversions() {
@@ -103,7 +103,7 @@ export default function Conversions() {
                 />
               )
             ) : (
-              <FunnelView siteId={siteId} />
+              <FlowView siteId={siteId} />
             )}
           </div>
 

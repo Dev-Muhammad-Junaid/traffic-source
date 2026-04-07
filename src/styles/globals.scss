@@ -643,104 +643,113 @@ a { color: var(--text); text-decoration: none; &:hover { color: var(--text-secon
   }
 }
 
-// ── Funnel ──
-.funnel {
-  padding: 20px 24px 24px;
+// ── Flow / User journey tree ──
+.flow {
+  padding: 18px 20px 20px;
 }
 
-.funnel-meta {
+.flow-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.flow-meta {
   font-size: 12px;
   color: var(--text-muted);
-  margin-bottom: 18px;
 
   strong { color: var(--text); font-weight: 600; }
+  code {
+    font-family: var(--font-mono);
+    background: var(--bg-surface);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text);
+    margin-left: 4px;
+  }
 }
 
-.funnel-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.funnel-step {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.funnel-step-head {
+.flow-controls {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.funnel-step-index {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
+.flow-toggle {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  input { cursor: pointer; }
 }
 
-.funnel-step-path {
-  flex: 1;
-  font-size: 13px;
+.flow-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   color: var(--text);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: var(--font);
+  outline: none;
+
+  &:focus { border-color: var(--border-focus); }
+}
+
+.flow-canvas {
+  overflow-x: auto;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 8px;
+}
+
+.flow-node-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  font-family: var(--font);
+  pointer-events: none;
+}
+
+.flow-node-path {
   font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.funnel-step-visitors {
+.flow-node-visitors {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
+  margin-top: 3px;
   font-variant-numeric: tabular-nums;
 
-  strong { font-size: 14px; font-weight: 600; color: var(--text-heading); }
+  strong { font-size: 13px; font-weight: 600; color: var(--text-heading); }
+  span {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
 }
 
-.funnel-step-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-
-.funnel-bar-track {
-  height: 8px;
-  background: var(--bg-surface);
-  border-radius: 100px;
-  overflow: hidden;
-}
-
-.funnel-bar-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 100px;
-  transition: width 0.3s ease;
-}
-
-.funnel-step-foot {
-  display: flex;
-  gap: 16px;
+.flow-hint {
+  margin-top: 12px;
   font-size: 11px;
   color: var(--text-muted);
-  padding-left: 34px;
-}
-
-.funnel-drop {
-  color: var(--text-secondary);
-
-  &.bad { color: var(--danger); }
+  text-align: center;
 }
 
 // ── Channel/Tech icons ──
