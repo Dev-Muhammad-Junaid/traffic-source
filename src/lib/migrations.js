@@ -174,6 +174,154 @@ const migrations = [
       CREATE UNIQUE INDEX idx_affiliates_share_token ON affiliates(share_token);
     `);
   },
+  // Migration 6: Google Search Console integration
+  (db) => {
+    db.exec(`
+      CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE gsc_connections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL UNIQUE,
+        google_email TEXT,
+        refresh_token TEXT NOT NULL,
+        gsc_property TEXT,
+        status TEXT DEFAULT 'pending',
+        last_sync_at TEXT,
+        last_error TEXT,
+        connected_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE gsc_daily (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        query TEXT NOT NULL,
+        page TEXT,
+        clicks INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0,
+        position REAL DEFAULT 0,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, date, query, page)
+      );
+
+      CREATE TABLE gsc_trends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        query TEXT NOT NULL,
+        clicks_28d INTEGER DEFAULT 0,
+        clicks_prev_28d INTEGER DEFAULT 0,
+        delta_clicks INTEGER DEFAULT 0,
+        impressions_28d INTEGER DEFAULT 0,
+        impressions_prev_28d INTEGER DEFAULT 0,
+        position_28d REAL DEFAULT 0,
+        position_prev_28d REAL DEFAULT 0,
+        delta_position REAL DEFAULT 0,
+        ctr_28d REAL DEFAULT 0,
+        status TEXT,
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, query)
+      );
+
+      CREATE INDEX idx_gsc_daily_site_date ON gsc_daily(site_id, date);
+      CREATE INDEX idx_gsc_daily_site_query ON gsc_daily(site_id, query);
+      CREATE INDEX idx_gsc_trends_site_status ON gsc_trends(site_id, status);
+    `);
+  },
+  // Migration 7: Move GSC OAuth to user-level; add per-site property links
+  (db) => {
+    db.exec(`
+      DROP TABLE IF EXISTS gsc_connections;
+
+      CREATE TABLE gsc_connections (
+        user_id INTEGER PRIMARY KEY,
+        google_email TEXT,
+        refresh_token TEXT NOT NULL,
+        connected_at TEXT DEFAULT (datetime('now')),
+        last_error TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE gsc_site_links (
+        site_id INTEGER PRIMARY KEY,
+        gsc_property TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        last_sync_at TEXT,
+        last_error TEXT,
+        linked_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+      );
+    `);
+  },
+  // Migration 8: Separate page-level + totals tables (avoid anonymized-query undercount)
+  (db) => {
+    db.exec(`
+      CREATE TABLE gsc_daily_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        page TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0,
+        position REAL DEFAULT 0,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, date, page)
+      );
+      CREATE INDEX idx_gsc_pages_site_date ON gsc_daily_pages(site_id, date);
+
+      CREATE TABLE gsc_daily_totals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0,
+        position REAL DEFAULT 0,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, date)
+      );
+      CREATE INDEX idx_gsc_totals_site_date ON gsc_daily_totals(site_id, date);
+    `);
+  },
+  // Migration 9: Countries + devices breakdowns
+  (db) => {
+    db.exec(`
+      CREATE TABLE gsc_daily_countries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        country TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0,
+        position REAL DEFAULT 0,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, date, country)
+      );
+      CREATE INDEX idx_gsc_countries_site_date ON gsc_daily_countries(site_id, date);
+
+      CREATE TABLE gsc_daily_devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        device TEXT NOT NULL,
+        clicks INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0,
+        position REAL DEFAULT 0,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        UNIQUE(site_id, date, device)
+      );
+      CREATE INDEX idx_gsc_devices_site_date ON gsc_daily_devices(site_id, date);
+    `);
+  },
 ];
 
 export function runMigrations(db) {

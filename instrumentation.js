@@ -23,5 +23,23 @@ export async function register() {
 
     // Then sync every 60 seconds
     setInterval(runSync, SYNC_INTERVAL);
+
+    // ── Google Search Console sync (runs every hour, internally throttled to once/12h per site) ──
+    const GSC_INTERVAL = 60 * 60 * 1000; // 1 hour
+    const runGscSync = async () => {
+      try {
+        const { syncAllConnections } = await import('./src/lib/gsc-sync.js');
+        const result = await syncAllConnections();
+        if (result.synced > 0) {
+          console.log(`[GSC Sync] Synced ${result.synced} site(s)`);
+        }
+      } catch (err) {
+        if (!err.message?.includes('no such table')) {
+          console.error('[GSC Sync] Error:', err.message);
+        }
+      }
+    };
+    setTimeout(runGscSync, 15000);
+    setInterval(runGscSync, GSC_INTERVAL);
   }
 }
