@@ -2,44 +2,45 @@ import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 import { parseDateRange, verifySiteOwnership } from '@/lib/analytics';
 
-function buildSessionFilters(query) {
+function buildSessionFilters(query, alias = '') {
+  const pfx = alias ? `${alias}.` : '';
   const clauses = [];
   const params = [];
 
   if (query.channel) {
     if (query.channel === 'Direct') {
-      clauses.push(`(utm_source IS NULL AND (referrer_domain IS NULL OR referrer_domain = ''))`);
+      clauses.push(`(${pfx}utm_source IS NULL AND (${pfx}referrer_domain IS NULL OR ${pfx}referrer_domain = ''))`);
     } else {
-      clauses.push(`(utm_source = ? OR referrer_domain = ?)`);
+      clauses.push(`(${pfx}utm_source = ? OR ${pfx}referrer_domain = ?)`);
       params.push(query.channel, query.channel);
     }
   }
   if (query.country) {
-    clauses.push(`country = ?`);
+    clauses.push(`${pfx}country = ?`);
     params.push(query.country);
   }
   if (query.city) {
-    clauses.push(`city = ?`);
+    clauses.push(`${pfx}city = ?`);
     params.push(query.city);
   }
   if (query.entry_page) {
-    clauses.push(`entry_page = ?`);
+    clauses.push(`${pfx}entry_page = ?`);
     params.push(query.entry_page);
   }
   if (query.exit_page) {
-    clauses.push(`exit_page = ?`);
+    clauses.push(`${pfx}exit_page = ?`);
     params.push(query.exit_page);
   }
   if (query.browser) {
-    clauses.push(`browser = ?`);
+    clauses.push(`${pfx}browser = ?`);
     params.push(query.browser);
   }
   if (query.os) {
-    clauses.push(`os = ?`);
+    clauses.push(`${pfx}os = ?`);
     params.push(query.os);
   }
   if (query.device) {
-    clauses.push(`device_type = ?`);
+    clauses.push(`${pfx}device_type = ?`);
     params.push(query.device);
   }
 
@@ -88,11 +89,13 @@ export default withAuth(function handler(req, res) {
   };
 
   const sf = buildSessionFilters(req.query);
+  const sfAliased = buildSessionFilters(req.query, 's');
   const pvf = buildPageViewFilters(req.query);
   const useSessionFilters = hasSessionFilters(req.query);
   const usePageFilter = !!req.query.page;
 
   const sfWhere = sf.clauses.length > 0 ? ' AND ' + sf.clauses.join(' AND ') : '';
+  const sfAliasedWhere = sfAliased.clauses.length > 0 ? ' AND ' + sfAliased.clauses.join(' AND ') : '';
   const pvfWhere = pvf.clauses.length > 0 ? ' AND ' + pvf.clauses.join(' AND ') : '';
 
   // Current period totals — when filters are active, compute from sessions table
@@ -115,9 +118,9 @@ export default withAuth(function handler(req, res) {
           COALESCE(AVG(s.duration), 0) as avg_duration
          FROM sessions s
          ${sessionJoinPv}
-         WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfWhere}${pvFilterClause}`
+         WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfAliasedWhere}${pvFilterClause}`
       )
-      .get(siteId, range.from, dateEnd, ...sf.params, ...pvParams);
+      .get(siteId, range.from, dateEnd, ...sfAliased.params, ...pvParams);
 
     previous = db
       .prepare(
@@ -129,9 +132,9 @@ export default withAuth(function handler(req, res) {
           COALESCE(AVG(s.duration), 0) as avg_duration
          FROM sessions s
          ${sessionJoinPv}
-         WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfWhere}${pvFilterClause}`
+         WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfAliasedWhere}${pvFilterClause}`
       )
-      .get(siteId, prevRange.from, prevRange.to + ' 23:59:59', ...sf.params, ...pvParams);
+      .get(siteId, prevRange.from, prevRange.to + ' 23:59:59', ...sfAliased.params, ...pvParams);
   } else {
     current = db
       .prepare(
@@ -187,10 +190,10 @@ export default withAuth(function handler(req, res) {
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
            ${sessionJoinPv}
-           WHERE s.site_id = ? AND s.started_at >= datetime('now', '-24 hours')${sfWhere}${pvFilterClause}
+           WHERE s.site_id = ? AND s.started_at >= datetime('now', '-24 hours')${sfAliasedWhere}${pvFilterClause}
            GROUP BY date ORDER BY date ASC`
         )
-        .all(siteId, ...sf.params, ...pvParams);
+        .all(siteId, ...sfAliased.params, ...pvParams);
     } else {
       timeSeries = db
         .prepare(
@@ -200,10 +203,10 @@ export default withAuth(function handler(req, res) {
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
            ${sessionJoinPv}
-           WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfWhere}${pvFilterClause}
+           WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfAliasedWhere}${pvFilterClause}
            GROUP BY date ORDER BY date ASC`
         )
-        .all(siteId, range.from, dateEnd, ...sf.params, ...pvParams);
+        .all(siteId, range.from, dateEnd, ...sfAliased.params, ...pvParams);
     }
   } else {
     if (req.query.period === '24h') {
@@ -257,10 +260,10 @@ export default withAuth(function handler(req, res) {
           COUNT(DISTINCT pv.visitor_id) as visitors
          FROM page_views pv
          INNER JOIN sessions s ON s.site_id = pv.site_id AND s.id = pv.session_id
-         WHERE pv.site_id = ? AND datetime(pv.timestamp) BETWEEN ? AND ?${sfWhere}${pvfWhere}
+         WHERE pv.site_id = ? AND datetime(pv.timestamp) BETWEEN ? AND ?${sfAliasedWhere}${pvfWhere}
          GROUP BY pv.pathname ORDER BY views DESC LIMIT 20`
       )
-      .all(siteId, range.from, dateEnd, ...sf.params, ...pvf.params);
+      .all(siteId, range.from, dateEnd, ...sfAliased.params, ...pvf.params);
   } else {
     pages = db
       .prepare(
@@ -338,9 +341,9 @@ export default withAuth(function handler(req, res) {
          FROM conversions c
          INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
-         AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}`
+         AND datetime(c.created_at) BETWEEN ? AND ?${sfAliasedWhere}`
       )
-      .get(siteId, range.from, dateEnd, ...sf.params);
+      .get(siteId, range.from, dateEnd, ...sfAliased.params);
 
     convBySource = db
       .prepare(
@@ -350,10 +353,10 @@ export default withAuth(function handler(req, res) {
          FROM conversions c
          INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
-         AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}
+         AND datetime(c.created_at) BETWEEN ? AND ?${sfAliasedWhere}
          GROUP BY name ORDER BY revenue DESC LIMIT 10`
       )
-      .all(siteId, range.from, dateEnd, ...sf.params);
+      .all(siteId, range.from, dateEnd, ...sfAliased.params);
 
     convTimeSeries = db
       .prepare(
@@ -363,10 +366,10 @@ export default withAuth(function handler(req, res) {
          FROM conversions c
          INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
-         AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}
+         AND datetime(c.created_at) BETWEEN ? AND ?${sfAliasedWhere}
          GROUP BY date ORDER BY date ASC`
       )
-      .all(siteId, range.from, dateEnd, ...sf.params);
+      .all(siteId, range.from, dateEnd, ...sfAliased.params);
   } else {
     convTotals = db
       .prepare(
