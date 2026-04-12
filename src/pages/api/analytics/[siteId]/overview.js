@@ -100,7 +100,7 @@ export default withAuth(function handler(req, res) {
   if (useSessionFilters || usePageFilter) {
     // Build from sessions + page_views with filters
     const sessionJoinPv = usePageFilter
-      ? `INNER JOIN page_views pv ON pv.site_id = s.site_id AND pv.session_id = s.session_id`
+      ? `INNER JOIN page_views pv ON pv.site_id = s.site_id AND pv.session_id = s.id`
       : '';
     const pvFilterClause = usePageFilter ? ` AND pv.pathname = ?` : '';
     const pvParams = usePageFilter ? [req.query.page] : [];
@@ -109,7 +109,7 @@ export default withAuth(function handler(req, res) {
       .prepare(
         `SELECT
           COUNT(DISTINCT s.visitor_id) as total_visitors,
-          COUNT(DISTINCT s.session_id) as total_sessions,
+          COUNT(DISTINCT s.id) as total_sessions,
           COALESCE(SUM(s.page_count), 0) as total_page_views,
           COALESCE(SUM(s.is_bounce), 0) as total_bounces,
           COALESCE(AVG(s.duration), 0) as avg_duration
@@ -123,7 +123,7 @@ export default withAuth(function handler(req, res) {
       .prepare(
         `SELECT
           COUNT(DISTINCT s.visitor_id) as total_visitors,
-          COUNT(DISTINCT s.session_id) as total_sessions,
+          COUNT(DISTINCT s.id) as total_sessions,
           COALESCE(SUM(s.page_count), 0) as total_page_views,
           COALESCE(SUM(s.is_bounce), 0) as total_bounces,
           COALESCE(AVG(s.duration), 0) as avg_duration
@@ -173,7 +173,7 @@ export default withAuth(function handler(req, res) {
   let timeSeries;
   if (useSessionFilters || usePageFilter) {
     const sessionJoinPv = usePageFilter
-      ? `INNER JOIN page_views pv ON pv.site_id = s.site_id AND pv.session_id = s.session_id`
+      ? `INNER JOIN page_views pv ON pv.site_id = s.site_id AND pv.session_id = s.id`
       : '';
     const pvFilterClause = usePageFilter ? ` AND pv.pathname = ?` : '';
     const pvParams = usePageFilter ? [req.query.page] : [];
@@ -182,7 +182,7 @@ export default withAuth(function handler(req, res) {
       timeSeries = db
         .prepare(
           `SELECT strftime('%Y-%m-%d %H:00', s.started_at) as date,
-                  COUNT(DISTINCT s.session_id) as sessions,
+                  COUNT(DISTINCT s.id) as sessions,
                   COUNT(DISTINCT s.visitor_id) as visitors,
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
@@ -196,7 +196,7 @@ export default withAuth(function handler(req, res) {
         .prepare(
           `SELECT date(s.started_at) as date,
                   COUNT(DISTINCT s.visitor_id) as visitors,
-                  COUNT(DISTINCT s.session_id) as sessions,
+                  COUNT(DISTINCT s.id) as sessions,
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
            ${sessionJoinPv}
@@ -256,7 +256,7 @@ export default withAuth(function handler(req, res) {
         `SELECT pv.pathname as name, COUNT(*) as views,
           COUNT(DISTINCT pv.visitor_id) as visitors
          FROM page_views pv
-         INNER JOIN sessions s ON s.site_id = pv.site_id AND s.session_id = pv.session_id
+         INNER JOIN sessions s ON s.site_id = pv.site_id AND s.id = pv.session_id
          WHERE pv.site_id = ? AND datetime(pv.timestamp) BETWEEN ? AND ?${sfWhere}${pvfWhere}
          GROUP BY pv.pathname ORDER BY views DESC LIMIT 20`
       )
@@ -336,7 +336,7 @@ export default withAuth(function handler(req, res) {
           COALESCE(SUM(c.amount), 0) as total_revenue,
           COALESCE(AVG(c.amount), 0) as avg_value
          FROM conversions c
-         INNER JOIN sessions s ON s.site_id = c.site_id AND s.session_id = c.session_id
+         INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
          AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}`
       )
@@ -348,7 +348,7 @@ export default withAuth(function handler(req, res) {
           COUNT(*) as conversions,
           SUM(c.amount) as revenue
          FROM conversions c
-         INNER JOIN sessions s ON s.site_id = c.site_id AND s.session_id = c.session_id
+         INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
          AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}
          GROUP BY name ORDER BY revenue DESC LIMIT 10`
@@ -361,7 +361,7 @@ export default withAuth(function handler(req, res) {
           COUNT(*) as conversions,
           SUM(c.amount) as revenue
          FROM conversions c
-         INNER JOIN sessions s ON s.site_id = c.site_id AND s.session_id = c.session_id
+         INNER JOIN sessions s ON s.site_id = c.site_id AND s.id = c.session_id
          WHERE c.site_id = ? AND c.status = 'completed'
          AND datetime(c.created_at) BETWEEN ? AND ?${sfWhere}
          GROUP BY date ORDER BY date ASC`
