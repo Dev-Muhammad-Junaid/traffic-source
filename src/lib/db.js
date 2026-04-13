@@ -21,3 +21,10 @@ export function getDb() {
   }
   return db;
 }
+
+export function resetDb() {
+  if (db) {
+    try { db.close(); } catch {}
+  }
+  db = null;
+}

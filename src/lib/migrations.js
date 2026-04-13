@@ -322,6 +322,21 @@ const migrations = [
       CREATE INDEX idx_gsc_devices_site_date ON gsc_daily_devices(site_id, date);
     `);
   },
+  // Migration 10: Backup history
+  (db) => {
+    db.exec(`
+      CREATE TABLE backup_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        size_bytes INTEGER DEFAULT 0,
+        storage_provider TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        started_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        error TEXT
+      );
+    `);
+  },
 ];
 
 export function runMigrations(db) {

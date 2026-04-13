@@ -30,6 +30,7 @@ export default function Settings() {
               <div className="panel-tabs">
                 <button className={`panel-tab ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>Profile</button>
                 <button className={`panel-tab ${tab === 'integrations' ? 'active' : ''}`} onClick={() => setTab('integrations')}>Integrations</button>
+                <button className={`panel-tab ${tab === 'backups' ? 'active' : ''}`} onClick={() => setTab('backups')}>Backups</button>
               </div>
             </div>
             <div className="panel-body" style={{ padding: 20 }}>
@@ -55,6 +56,7 @@ export default function Settings() {
                 </form>
               )}
               {tab === 'integrations' && <GscIntegration />}
+              {tab === 'backups' && <BackupSettings />}
             </div>
           </div>
         </div>
@@ -293,4 +295,406 @@ function GscIntegration() {
       </div>
     </div>
   );
+}
+
+const PROVIDERS = [
+  { value: 'aws', label: 'AWS S3', endpoint: 'https://s3.{region}.amazonaws.com', region: 'us-east-1' },
+  { value: 'digitalocean', label: 'DigitalOcean Spaces', endpoint: 'https://{region}.digitaloceanspaces.com', region: 'nyc3' },
+  { value: 'cloudflare', label: 'Cloudflare R2', endpoint: 'https://{account_id}.r2.cloudflarestorage.com', region: 'auto' },
+  { value: 'backblaze', label: 'Backblaze B2', endpoint: 'https://s3.{region}.backblazeb2.com', region: 'us-west-004' },
+  { value: 'wasabi', label: 'Wasabi', endpoint: 'https://s3.{region}.wasabisys.com', region: 'us-east-1' },
+  { value: 'minio', label: 'MinIO (Self-hosted)', endpoint: 'http://localhost:9000', region: 'us-east-1' },
+  { value: 'custom', label: 'Custom S3-compatible', endpoint: '', region: '' },
+];
+
+function BackupSettings() {
+  const [config, setConfig] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [provider, setProvider] = useState('aws');
+  const [endpoint, setEndpoint] = useState('');
+  const [region, setRegion] = useState('us-east-1');
+  const [bucket, setBucket] = useState('');
+  const [accessKeyId, setAccessKeyId] = useState('');
+  const [secretAccessKey, setSecretAccessKey] = useState('');
+  const [prefix, setPrefix] = useState('');
+  const [schedule, setSchedule] = useState('daily');
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [history, setHistory] = useState([]);
+  const [remoteBackups, setRemoteBackups] = useState([]);
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [restoring, setRestoring] = useState(null);
+  const [showRestore, setShowRestore] = useState(false);
+
+  const loadConfig = async () => {
+    setLoading(true);
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch('/api/settings/backup/config'),
+        fetch('/api/settings/backup/history'),
+      ]);
+      if (r1.ok) {
+        const data = await r1.json();
+        setConfig(data.config);
+        if (data.config.provider) setProvider(data.config.provider);
+        if (data.config.endpoint) setEndpoint(data.config.endpoint);
+        if (data.config.region) setRegion(data.config.region);
+        if (data.config.bucket) setBucket(data.config.bucket);
+        if (data.config.prefix) setPrefix(data.config.prefix);
+        if (data.config.schedule) setSchedule(data.config.schedule);
+      }
+      if (r2.ok) {
+        const data = await r2.json();
+        setHistory(data.history || []);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { loadConfig(); }, []);
+
+  const handleProviderChange = (val) => {
+    setProvider(val);
+    const p = PROVIDERS.find(pr => pr.value === val);
+    if (p) {
+      setEndpoint(p.endpoint);
+      setRegion(p.region);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await fetch('/api/settings/backup/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint, region, bucket, access_key_id: accessKeyId, secret_access_key: secretAccessKey }),
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setMsg('Connection successful!');
+      } else {
+        setErr(data.error || 'Connection failed');
+      }
+    } catch (e) {
+      setErr('Connection failed: ' + e.message);
+    }
+    setTesting(false);
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await fetch('/api/settings/backup/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint, region, bucket, access_key_id: accessKeyId, secret_access_key: secretAccessKey, prefix, provider, schedule }),
+      });
+      if (r.ok) {
+        setMsg('Backup configuration saved.');
+        setAccessKeyId('');
+        setSecretAccessKey('');
+        loadConfig();
+      } else {
+        const data = await r.json();
+        setErr(data.error || 'Failed to save');
+      }
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  };
+
+  const handleBackupNow = async () => {
+    setBackingUp(true);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await fetch('/api/settings/backup/run', { method: 'POST' });
+      const data = await r.json();
+      if (r.ok) {
+        setMsg(`Backup completed: ${data.filename} (${formatBytes(data.sizeBytes)})`);
+        loadConfig();
+      } else {
+        setErr(data.error || 'Backup failed');
+      }
+    } catch (e) {
+      setErr('Backup failed: ' + e.message);
+    }
+    setBackingUp(false);
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('Remove backup configuration?')) return;
+    await fetch('/api/settings/backup/config', { method: 'DELETE' });
+    setConfig(null);
+    setEndpoint('');
+    setRegion('us-east-1');
+    setBucket('');
+    setAccessKeyId('');
+    setSecretAccessKey('');
+    setPrefix('');
+    setProvider('aws');
+    setMsg('Backup configuration removed.');
+  };
+
+  const handleLoadRemoteBackups = async () => {
+    setLoadingRemote(true);
+    setErr('');
+    setShowRestore(true);
+    try {
+      const r = await fetch('/api/settings/backup/restore');
+      const data = await r.json();
+      if (r.ok) {
+        setRemoteBackups(data.backups || []);
+      } else {
+        setErr(data.error || 'Failed to list backups');
+      }
+    } catch (e) {
+      setErr('Failed to list backups: ' + e.message);
+    }
+    setLoadingRemote(false);
+  };
+
+  const handleRestore = async (key, filename) => {
+    if (!confirm(`Restore database from "${filename}"?\n\nThis will replace your current database. A safety backup will be created automatically before restoring.`)) return;
+    setRestoring(key);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await fetch('/api/settings/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setMsg(`Database restored from "${data.restored}". Safety backup saved as "${data.safetyBackup}". Reloading...`);
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setErr(data.error || 'Restore failed');
+      }
+    } catch (e) {
+      setErr('Restore failed: ' + e.message);
+    }
+    setRestoring(null);
+  };
+
+  if (loading) return <div className="loading-inline"><div className="loading-spinner" /></div>;
+
+  const isConfigured = config && config.endpoint && config.bucket;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h3 style={{ margin: 0, fontSize: 16 }}>Database Backup</h3>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+          Back up your SQLite database to any S3-compatible storage — AWS S3, DigitalOcean Spaces, Cloudflare R2, Backblaze B2, and more.
+        </p>
+      </div>
+
+      {msg && <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13 }}>{msg}</div>}
+      {err && <div className="auth-error">{err}</div>}
+
+      {isConfigured && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--success-light)', borderRadius: 'var(--radius)', fontSize: 13 }}>
+          <span style={{ color: 'var(--success)', fontWeight: 600 }}>Configured</span>
+          <span style={{ color: 'var(--text-muted)' }}>{config.bucket} &middot; {config.provider || 'custom'}</span>
+          <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={handleRemove}>Remove</button>
+        </div>
+      )}
+
+      <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="form-group">
+          <label>Provider</label>
+          <select value={provider} onChange={(e) => handleProviderChange(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}>
+            {PROVIDERS.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Endpoint URL</label>
+          <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://s3.us-east-1.amazonaws.com" />
+          {provider !== 'custom' && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              Replace placeholder values (e.g. {'{region}'}, {'{account_id}'}) with your actual values.
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-group">
+            <label>Region</label>
+            <input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-east-1" />
+          </div>
+          <div className="form-group">
+            <label>Bucket Name</label>
+            <input type="text" value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="my-backups" />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-group">
+            <label>Access Key ID</label>
+            <input type="text" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} placeholder={isConfigured ? config.access_key_id : 'AKIA...'} />
+          </div>
+          <div className="form-group">
+            <label>Secret Access Key</label>
+            <input type="password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} placeholder={isConfigured ? '****' : 'Your secret key'} />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-group">
+            <label>Path Prefix <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="backups/trafficsource" />
+          </div>
+          <div className="form-group">
+            <label>Auto Backup Schedule</label>
+            <select value={schedule} onChange={(e) => setSchedule(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}>
+              <option value="12h">Every 12 hours</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="submit" className="btn btn-primary" disabled={saving || !endpoint || !bucket || !accessKeyId || !secretAccessKey}>
+            {saving ? 'Saving...' : isConfigured ? 'Update Configuration' : 'Save Configuration'}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleTestConnection} disabled={testing || !endpoint || !bucket || !accessKeyId || !secretAccessKey}>
+            {testing ? 'Testing...' : 'Test Connection'}
+          </button>
+        </div>
+      </form>
+
+      {isConfigured && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Manual Backup</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Create a snapshot and upload it now.</div>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={handleBackupNow} disabled={backingUp}>
+              {backingUp ? 'Backing up...' : 'Backup Now'}
+            </button>
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)' }}>
+            Auto backups run on the schedule you selected above. No external cron needed.
+          </div>
+        </div>
+      )}
+
+      {isConfigured && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Restore Database</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Rollback to a previous backup. A safety backup is created automatically before restoring.</div>
+            </div>
+            <button type="button" className="btn btn-secondary" onClick={handleLoadRemoteBackups} disabled={loadingRemote}>
+              {loadingRemote ? 'Loading...' : showRestore ? 'Refresh List' : 'Show Backups'}
+            </button>
+          </div>
+
+          {showRestore && (
+            <>
+              {remoteBackups.length === 0 && !loadingRemote && (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: 12, textAlign: 'center' }}>No backups found in storage.</div>
+              )}
+              {remoteBackups.length > 0 && (
+                <table className="journey-table">
+                  <thead>
+                    <tr>
+                      <th>Filename</th>
+                      <th>Size</th>
+                      <th>Date</th>
+                      <th style={{ textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {remoteBackups.map((b) => (
+                      <tr key={b.key}>
+                        <td><span style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{b.filename}</span></td>
+                        <td>{formatBytes(b.size)}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(b.lastModified).toLocaleString()}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleRestore(b.key, b.filename)}
+                            disabled={restoring !== null}
+                            style={{ fontSize: 11 }}
+                          >
+                            {restoring === b.key ? 'Restoring...' : 'Restore'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Backup History</div>
+          <table className="journey-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.id}>
+                  <td><span style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{h.filename || '—'}</span></td>
+                  <td>{h.size_bytes ? formatBytes(h.size_bytes) : '—'}</td>
+                  <td>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      background: h.status === 'completed' ? 'var(--success-light)' : h.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
+                      color: h.status === 'completed' ? 'var(--success)' : h.status === 'failed' ? '#ef4444' : '#eab308',
+                    }}>
+                      {h.status}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{h.completed_at || h.started_at}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
