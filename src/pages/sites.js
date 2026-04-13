@@ -7,6 +7,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import dynamic from 'next/dynamic';
 import CountryFlag from '@/components/ui/CountryFlag';
 import TechIcon from '@/components/ui/TechIcon';
+import VisitorAvatar from '@/components/ui/VisitorAvatar';
 import { getCountryName } from '@/lib/formatters';
 
 const VisitorMap = dynamic(() => import('@/components/ui/VisitorMap'), { ssr: false });
@@ -339,36 +340,47 @@ function OverviewDashboard({ onClose }) {
                             <div
                                 key={i}
                                 style={{
-                                    padding: '12px 20px',
+                                    padding: '14px 20px',
                                     borderBottom: '1px solid var(--border-light)',
                                     display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 6,
+                                    gap: 12,
                                     animation: 'fadeIn 0.3s ease',
                                 }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    {u.country && <CountryFlag code={u.country} size="s" />}
-                                    <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {u.country ? getCountryName(u.country) : 'Unknown'}
-                                    </span>
-                                    <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
-                                        {u.site_name}
-                                    </span>
+                                <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                                    <VisitorAvatar visitorId={u.visitor_id} size={36} />
                                 </div>
-                                <div style={{ fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {u.current_page || '/'}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: 'var(--text-muted)' }}>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <TechIcon type="browser" name={u.browser} /> {u.browser || 'Unknown'}
-                                    </span>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <TechIcon type="device" name={u.device_type} /> {u.device_type || 'Desktop'}
-                                    </span>
-                                    <span style={{ marginLeft: 'auto', fontSize: 10 }}>
-                                        via {u.source}
-                                    </span>
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        {u.country && <CountryFlag code={u.country} size="s" />}
+                                        <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {u.country ? getCountryName(u.country) : 'Unknown'}
+                                        </span>
+                                        {u.site_domain && (
+                                            <img
+                                                src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
+                                                alt=""
+                                                width={14}
+                                                height={14}
+                                                style={{ borderRadius: 3, flexShrink: 0, opacity: 0.7 }}
+                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                            />
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {u.current_page || '/'}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                            <TechIcon type="browser" name={u.browser} /> {u.browser || 'Unknown'}
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                            <TechIcon type="device" name={u.device_type} /> {u.device_type || 'Desktop'}
+                                        </span>
+                                        <span style={{ marginLeft: 'auto', fontSize: 10 }}>
+                                            via {u.source}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         ))
