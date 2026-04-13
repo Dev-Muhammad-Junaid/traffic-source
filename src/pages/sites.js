@@ -348,36 +348,45 @@ function OverviewDashboard({ onClose }) {
                                 }}
                             >
                                 <VisitorAvatar visitorId={u.visitor_id} size={32} />
-                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                    {/* Row 1: Country + page */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        {u.country && <CountryFlag code={u.country} size="s" />}
-                                        <span style={{ fontWeight: 600, fontSize: 12 }}>
-                                            {u.country ? getCountryName(u.country) : 'Unknown'}
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {/* Row 1: Country + site */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                            {u.country && <CountryFlag code={u.country} size="s" />}
+                                            <span style={{ fontWeight: 600, fontSize: 12 }}>
+                                                {u.country ? getCountryName(u.country) : 'Unknown'}
+                                            </span>
                                         </span>
-                                    </div>
-                                    {/* Row 2: Page path */}
-                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {u.current_page || '/'}
-                                    </div>
-                                    {/* Row 3: Meta icons + site */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-muted)' }}>
-                                        <TechIcon type="browser" name={u.browser} />
-                                        <TechIcon type="device" name={u.device_type} />
-                                        <span>&middot;</span>
-                                        <span>{u.source}</span>
-                                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 0.7 }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
                                             {u.site_domain && (
                                                 <img
                                                     src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
                                                     alt=""
-                                                    width={11}
-                                                    height={11}
+                                                    width={10}
+                                                    height={10}
                                                     style={{ borderRadius: 2 }}
                                                     onError={(e) => { e.target.style.display = 'none'; }}
                                                 />
                                             )}
-                                            <span>{u.site_name}</span>
+                                            {u.site_name}
+                                        </span>
+                                    </div>
+                                    {/* Row 2: Page path */}
+                                    <div style={{ fontSize: 11, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', opacity: 0.7 }}>
+                                        {u.current_page || '/'}
+                                    </div>
+                                    {/* Row 3: Tags */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
+                                            <TechIcon type="browser" name={u.browser} />
+                                            {u.browser || 'Unknown'}
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
+                                            <TechIcon type="device" name={u.device_type} />
+                                            {u.device_type || 'Desktop'}
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
+                                            {u.source}
                                         </span>
                                     </div>
                                 </div>
