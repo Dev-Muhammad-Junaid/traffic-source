@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet';
+import { useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { useTheme } from '@/contexts/ThemeContext';
 import 'leaflet/dist/leaflet.css';
 
@@ -20,6 +21,19 @@ const COUNTRY_COORDS = {
   IE: [53.1, -8.2], HK: [22.4, 114.1], TW: [23.7, 120.9], LK: [7.9, 80.8],
 };
 
+function createAvatarIcon(visitorId) {
+  const seed = visitorId || 'unknown';
+  const src = `https://api.dicebear.com/9.x/micah/svg?seed=${encodeURIComponent(seed)}&size=32&backgroundType=gradientLinear&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid #22c55e;box-shadow:0 2px 8px rgba(0,0,0,0.2);background:#fff;">
+      <img src="${src}" width="32" height="32" style="display:block;" />
+    </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
 function ThemeUpdater() {
   const { theme } = useTheme();
   const map = useMap();
@@ -39,6 +53,19 @@ export default function VisitorMap({ countries = [], activeUsers = [] }) {
     : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 
   const maxCount = Math.max(...countries.map(c => c.count), 1);
+
+  // Stable random offsets so avatars don't jump on re-render
+  const userPositions = useMemo(() => {
+    return activeUsers
+      .filter(u => COUNTRY_COORDS[u.country])
+      .map(u => ({
+        ...u,
+        position: [
+          COUNTRY_COORDS[u.country][0] + (Math.random() - 0.5) * 4,
+          COUNTRY_COORDS[u.country][1] + (Math.random() - 0.5) * 4,
+        ],
+      }));
+  }, [activeUsers]);
 
   return (
     <MapContainer
@@ -76,29 +103,17 @@ export default function VisitorMap({ countries = [], activeUsers = [] }) {
           );
         })}
 
-      {activeUsers
-        .filter(u => COUNTRY_COORDS[u.country])
-        .map((u, i) => (
-          <CircleMarker
-            key={`active-${i}`}
-            center={[
-              COUNTRY_COORDS[u.country][0] + (Math.random() - 0.5) * 4,
-              COUNTRY_COORDS[u.country][1] + (Math.random() - 0.5) * 4,
-            ]}
-            radius={4}
-            pathOptions={{
-              fillColor: '#22c55e',
-              fillOpacity: 0.9,
-              color: '#22c55e',
-              weight: 2,
-              opacity: 0.4,
-            }}
-          >
-            <Tooltip direction="top">
-              Active visitor &middot; {u.country}
-            </Tooltip>
-          </CircleMarker>
-        ))}
+      {userPositions.map((u, i) => (
+        <Marker
+          key={`active-${u.visitor_id || i}`}
+          position={u.position}
+          icon={createAvatarIcon(u.visitor_id)}
+        >
+          <Tooltip direction="top" offset={[0, -20]}>
+            {u.country} &middot; {u.current_page || '/'}
+          </Tooltip>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }
