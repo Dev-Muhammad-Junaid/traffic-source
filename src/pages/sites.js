@@ -275,6 +275,21 @@ export default function Sites() {
     );
 }
 
+const SITE_COLORS = [
+    { background: 'rgba(59,130,246,0.12)', color: '#3b82f6' },
+    { background: 'rgba(168,85,247,0.12)', color: '#a855f7' },
+    { background: 'rgba(236,72,153,0.12)', color: '#ec4899' },
+    { background: 'rgba(245,158,11,0.12)', color: '#f59e0b' },
+    { background: 'rgba(16,185,129,0.12)', color: '#10b981' },
+    { background: 'rgba(239,68,68,0.12)', color: '#ef4444' },
+    { background: 'rgba(6,182,212,0.12)', color: '#06b6d4' },
+    { background: 'rgba(99,102,241,0.12)', color: '#6366f1' },
+];
+
+function getSiteColor(siteId) {
+    return SITE_COLORS[(siteId || 0) % SITE_COLORS.length];
+}
+
 function OverviewDashboard({ onClose }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -349,26 +364,11 @@ function OverviewDashboard({ onClose }) {
                             >
                                 <VisitorAvatar visitorId={u.visitor_id} size={32} />
                                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    {/* Row 1: Country + site */}
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                                            {u.country && <CountryFlag code={u.country} size="s" />}
-                                            <span style={{ fontWeight: 600, fontSize: 12 }}>
-                                                {u.country ? getCountryName(u.country) : 'Unknown'}
-                                            </span>
-                                        </span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
-                                            {u.site_domain && (
-                                                <img
-                                                    src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
-                                                    alt=""
-                                                    width={10}
-                                                    height={10}
-                                                    style={{ borderRadius: 2 }}
-                                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                                />
-                                            )}
-                                            {u.site_name}
+                                    {/* Row 1: Country */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        {u.country && <CountryFlag code={u.country} size="s" />}
+                                        <span style={{ fontWeight: 600, fontSize: 12 }}>
+                                            {u.country ? getCountryName(u.country) : 'Unknown'}
                                         </span>
                                     </div>
                                     {/* Row 2: Page path */}
@@ -387,6 +387,19 @@ function OverviewDashboard({ onClose }) {
                                         </span>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card-hover)', padding: '1px 6px', borderRadius: 4 }}>
                                             {u.source}
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '1px 6px', borderRadius: 4, ...getSiteColor(u.site_id) }}>
+                                            {u.site_domain && (
+                                                <img
+                                                    src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
+                                                    alt=""
+                                                    width={10}
+                                                    height={10}
+                                                    style={{ borderRadius: 2 }}
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
+                                            )}
+                                            {u.site_name}
                                         </span>
                                     </div>
                                 </div>
