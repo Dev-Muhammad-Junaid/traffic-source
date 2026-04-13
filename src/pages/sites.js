@@ -340,45 +340,41 @@ function OverviewDashboard({ onClose }) {
                             <div
                                 key={i}
                                 style={{
-                                    padding: '14px 20px',
+                                    padding: '8px 14px',
                                     borderBottom: '1px solid var(--border-light)',
                                     display: 'flex',
-                                    gap: 12,
+                                    alignItems: 'center',
+                                    gap: 10,
                                     animation: 'fadeIn 0.3s ease',
                                 }}
                             >
-                                <div style={{ flexShrink: 0, paddingTop: 2 }}>
-                                    <VisitorAvatar visitorId={u.visitor_id} size={36} />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <VisitorAvatar visitorId={u.visitor_id} size={28} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                         {u.country && <CountryFlag code={u.country} size="s" />}
-                                        <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {u.country ? getCountryName(u.country) : 'Unknown'}
                                         </span>
-                                        {u.site_domain && (
-                                            <img
-                                                src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
-                                                alt=""
-                                                width={14}
-                                                height={14}
-                                                style={{ borderRadius: 3, flexShrink: 0, opacity: 0.7 }}
-                                                onError={(e) => { e.target.style.display = 'none'; }}
-                                            />
-                                        )}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {u.current_page || '/'}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                            <TechIcon type="browser" name={u.browser} /> {u.browser || 'Unknown'}
+                                        <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'right' }}>
+                                            {u.current_page || '/'}
                                         </span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                            <TechIcon type="device" name={u.device_type} /> {u.device_type || 'Desktop'}
-                                        </span>
-                                        <span style={{ marginLeft: 'auto', fontSize: 10 }}>
-                                            via {u.source}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                                        <TechIcon type="browser" name={u.browser} />
+                                        <TechIcon type="device" name={u.device_type} />
+                                        <span>via {u.source}</span>
+                                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            {u.site_domain && (
+                                                <img
+                                                    src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
+                                                    alt=""
+                                                    width={12}
+                                                    height={12}
+                                                    style={{ borderRadius: 2 }}
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
+                                            )}
+                                            <span>{u.site_name}</span>
                                         </span>
                                     </div>
                                 </div>
