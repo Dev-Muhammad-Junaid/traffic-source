@@ -337,6 +337,14 @@ const migrations = [
       );
     `);
   },
+  // Migration 11: Public sharing for sites
+  (db) => {
+    db.exec(`
+      ALTER TABLE sites ADD COLUMN is_public INTEGER DEFAULT 0;
+      ALTER TABLE sites ADD COLUMN public_slug TEXT;
+      CREATE UNIQUE INDEX idx_sites_public_slug ON sites(public_slug);
+    `);
+  },
 ];
 
 export function runMigrations(db) {

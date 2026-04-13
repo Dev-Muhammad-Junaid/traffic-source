@@ -60,6 +60,12 @@ export default function SiteSettings() {
   const [stripeSaving, setStripeSaving] = useState(false);
   const [stripeMessage, setStripeMessage] = useState('');
   const [stripeError, setStripeError] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicSlug, setPublicSlug] = useState('');
+  const [shareSaving, setShareSaving] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareError, setShareError] = useState('');
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     if (!siteId) return;
@@ -73,6 +79,8 @@ export default function SiteSettings() {
           const data = await siteRes.json();
           setSite(data.site);
           setStripeSecretKey(data.site.stripe_secret_key || '');
+          setIsPublic(!!data.site.is_public);
+          setPublicSlug(data.site.public_slug || '');
         }
         if (snippetRes.ok) {
           setSnippetData(await snippetRes.json());
@@ -117,6 +125,61 @@ export default function SiteSettings() {
     if (!confirm('Delete this site and all its data?')) return;
     await fetch(`/api/sites/${siteId}`, { method: 'DELETE' });
     router.push('/sites');
+  };
+
+  const handleTogglePublic = async (enable) => {
+    setShareSaving(true);
+    setShareMessage('');
+    setShareError('');
+    try {
+      const body = { is_public: enable };
+      if (enable && publicSlug) body.public_slug = publicSlug;
+      const res = await fetch(`/api/sites/${siteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setIsPublic(!!data.site.is_public);
+      setPublicSlug(data.site.public_slug || '');
+      setSite(data.site);
+      setShareMessage(enable ? 'Public analytics enabled.' : 'Public analytics disabled.');
+    } catch (err) {
+      setShareError(err.message);
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const handleUpdateSlug = async (e) => {
+    e.preventDefault();
+    setShareSaving(true);
+    setShareMessage('');
+    setShareError('');
+    try {
+      const res = await fetch(`/api/sites/${siteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ public_slug: publicSlug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPublicSlug(data.site.public_slug || '');
+      setSite(data.site);
+      setShareMessage('Slug updated.');
+    } catch (err) {
+      setShareError(err.message);
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const copyShareUrl = () => {
+    const url = `${window.location.origin}/shared/${publicSlug}`;
+    navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 1500);
   };
 
   const copyToClipboard = (text) => {
@@ -210,6 +273,74 @@ export default function SiteSettings() {
                 {stripeSaving ? 'Saving...' : 'Save Key'}
               </button>
             </form>
+          </div>
+        </div>
+
+        {/* ── Public Sharing ── */}
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <div className="panel-header">
+            <div className="panel-tabs">
+              <button className="panel-tab active">Public Analytics</button>
+            </div>
+          </div>
+          <div className="panel-body" style={{ padding: 20 }}>
+            {shareMessage && (
+              <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13, marginBottom: 12 }}>
+                {shareMessage}
+              </div>
+            )}
+            {shareError && <div className="auth-error" style={{ marginBottom: 12 }}>{shareError}</div>}
+
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Share your analytics publicly with a unique URL. Visitors can view traffic stats without needing to log in. Revenue and conversion data is not included.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <button
+                className={`btn ${isPublic ? 'btn-danger' : 'btn-primary'}`}
+                onClick={() => handleTogglePublic(!isPublic)}
+                disabled={shareSaving}
+                style={{ minWidth: 140 }}
+              >
+                {shareSaving ? 'Saving...' : isPublic ? 'Disable Sharing' : 'Enable Sharing'}
+              </button>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {isPublic ? 'Anyone with the link can view analytics.' : 'Analytics are private.'}
+              </span>
+            </div>
+
+            {isPublic && (
+              <>
+                <div style={{ padding: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                    Public URL
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <code style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 6, fontSize: 13, overflow: 'auto', color: 'var(--text)' }}>
+                      {typeof window !== 'undefined' ? `${window.location.origin}/shared/${publicSlug}` : `/shared/${publicSlug}`}
+                    </code>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={copyShareUrl}>
+                      {shareCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleUpdateSlug} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                    <label>Custom Slug</label>
+                    <input
+                      type="text"
+                      value={publicSlug}
+                      onChange={(e) => setPublicSlug(e.target.value.replace(/[^a-z0-9-]/gi, '').toLowerCase())}
+                      placeholder="my-site-analytics"
+                    />
+                  </div>
+                  <button type="submit" className="btn btn-secondary" disabled={shareSaving} style={{ height: 38 }}>
+                    {shareSaving ? 'Saving...' : 'Update Slug'}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
 

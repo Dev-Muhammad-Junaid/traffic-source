@@ -25,7 +25,7 @@ export default withAuth(function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    const { domain, name, stripe_secret_key } = req.body;
+    const { domain, name, stripe_secret_key, is_public, public_slug } = req.body;
     const cleanDomain = domain
       ? domain.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : site.domain;
@@ -41,6 +41,32 @@ export default withAuth(function handler(req, res) {
         stripe_secret_key || null,
         id
       );
+    }
+
+    if (is_public !== undefined) {
+      if (is_public) {
+        // Generate a slug if not provided
+        let slug = public_slug;
+        if (!slug) {
+          slug = site.public_slug || site.domain.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+        }
+        slug = slug.replace(/[^a-z0-9-]/gi, '').toLowerCase();
+        // Check uniqueness
+        const existing = db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
+        if (existing) {
+          return res.status(400).json({ error: 'This slug is already taken. Please choose a different one.' });
+        }
+        db.prepare('UPDATE sites SET is_public = 1, public_slug = ? WHERE id = ?').run(slug, id);
+      } else {
+        db.prepare('UPDATE sites SET is_public = 0 WHERE id = ?').run(id);
+      }
+    } else if (public_slug !== undefined && site.is_public) {
+      const slug = public_slug.replace(/[^a-z0-9-]/gi, '').toLowerCase();
+      const existing = db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
+      if (existing) {
+        return res.status(400).json({ error: 'This slug is already taken. Please choose a different one.' });
+      }
+      db.prepare('UPDATE sites SET public_slug = ? WHERE id = ?').run(slug, id);
     }
 
     const updated = db.prepare('SELECT * FROM sites WHERE id = ?').get(id);
