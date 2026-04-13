@@ -27,8 +27,8 @@ import { TbDeviceTv, TbWorld } from 'react-icons/tb';
 
 const SIZE = 14;
 
-function browserIcon(name = '') {
-  const v = name.toLowerCase();
+function browserIcon(name) {
+  const v = (name || '').toLowerCase();
   if (v.includes('chrome')) return <SiGooglechrome size={SIZE} color="#4285F4" />;
   if (v.includes('safari')) return <SiSafari size={SIZE} color="#1B88CA" />;
   if (v.includes('firefox')) return <SiFirefoxbrowser size={SIZE} color="#FF7139" />;
@@ -42,8 +42,8 @@ function browserIcon(name = '') {
   return <TbWorld size={SIZE} />;
 }
 
-function osIcon(name = '') {
-  const v = name.toLowerCase();
+function osIcon(name) {
+  const v = (name || '').toLowerCase();
   if (v.includes('windows')) return <FaWindows size={SIZE} color="#0078D6" />;
   if (v.includes('mac') || v.includes('ios') || v.includes('darwin')) return <FaApple size={SIZE} />;
   if (v.includes('android')) return <SiAndroid size={SIZE} color="#3DDC84" />;
@@ -55,8 +55,8 @@ function osIcon(name = '') {
   return <FaQuestion size={SIZE} />;
 }
 
-function deviceIcon(name = '') {
-  const v = name.toLowerCase();
+function deviceIcon(name) {
+  const v = (name || '').toLowerCase();
   if (v.includes('mobile') || v.includes('phone')) return <FaMobileAlt size={SIZE} />;
   if (v.includes('tablet') || v.includes('ipad')) return <FaTabletAlt size={SIZE} />;
   if (v.includes('tv') || v.includes('console')) return <TbDeviceTv size={SIZE} />;
