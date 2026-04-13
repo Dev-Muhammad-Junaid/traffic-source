@@ -340,36 +340,39 @@ function OverviewDashboard({ onClose }) {
                             <div
                                 key={i}
                                 style={{
-                                    padding: '8px 14px',
+                                    padding: '10px 16px',
                                     borderBottom: '1px solid var(--border-light)',
                                     display: 'flex',
-                                    alignItems: 'center',
                                     gap: 10,
                                     animation: 'fadeIn 0.3s ease',
                                 }}
                             >
-                                <VisitorAvatar visitorId={u.visitor_id} size={28} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <VisitorAvatar visitorId={u.visitor_id} size={32} />
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    {/* Row 1: Country + page */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                         {u.country && <CountryFlag code={u.country} size="s" />}
-                                        <span style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontWeight: 600, fontSize: 12 }}>
                                             {u.country ? getCountryName(u.country) : 'Unknown'}
                                         </span>
-                                        <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'right' }}>
-                                            {u.current_page || '/'}
-                                        </span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                                    {/* Row 2: Page path */}
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {u.current_page || '/'}
+                                    </div>
+                                    {/* Row 3: Meta icons + site */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-muted)' }}>
                                         <TechIcon type="browser" name={u.browser} />
                                         <TechIcon type="device" name={u.device_type} />
-                                        <span>via {u.source}</span>
-                                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>&middot;</span>
+                                        <span>{u.source}</span>
+                                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 0.7 }}>
                                             {u.site_domain && (
                                                 <img
                                                     src={`https://www.google.com/s2/favicons?domain=${u.site_domain}&sz=32`}
                                                     alt=""
-                                                    width={12}
-                                                    height={12}
+                                                    width={11}
+                                                    height={11}
                                                     style={{ borderRadius: 2 }}
                                                     onError={(e) => { e.target.style.display = 'none'; }}
                                                 />
