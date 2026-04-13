@@ -26,10 +26,8 @@ export default function DashboardLayout({ children, siteId, siteName, siteDomain
         <header className="app-header">
           <div className="app-header-left">
             <Link href="/sites" className="app-logo">
-              <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path fill="currentColor" d="m6.28 13.22l3.6-2.4a.17.17 0 0 0 .06-.12a.15.15 0 0 0-.06-.11L6.62 8.42a1.2 1.2 0 0 0-1.24 0l-3.26 2.17a.15.15 0 0 0-.06.11a.17.17 0 0 0 .06.12l3.6 2.4a.52.52 0 0 0 .56 0" />
-                <path fill="currentColor" d="M1.54 11.68a.1.1 0 0 0 0 .07v8.62a1.6 1.6 0 0 0 .62 1.17l3.26 2.29a1.2 1.2 0 0 0 1.24 0l3.26-2.29a1.6 1.6 0 0 0 .62-1.17v-8.62a.1.1 0 0 0 0-.07a.08.08 0 0 0-.08 0l-3.63 2.37a1.5 1.5 0 0 1-1.66 0l-3.55-2.36a.08.08 0 0 0-.08-.01m12-8.25a.1.1 0 0 0 0 .07v16.87a1.6 1.6 0 0 0 .62 1.17l3.26 2.29a1.2 1.2 0 0 0 1.24 0l3.26-2.29a1.6 1.6 0 0 0 .62-1.17V3.5a.1.1 0 0 0 0-.07a.08.08 0 0 0-.08 0L18.83 5.8a1.5 1.5 0 0 1-1.66 0l-3.55-2.36a.08.08 0 0 0-.08-.01" />
-                <path fill="currentColor" d="m18.28 5l3.6-2.4a.17.17 0 0 0 .06-.12a.15.15 0 0 0-.06-.11L18.62.17a1.2 1.2 0 0 0-1.24 0l-3.26 2.17a.15.15 0 0 0-.06.11a.17.17 0 0 0 .06.12L17.72 5a.52.52 0 0 0 .56 0" />
+              <svg width="22" height="22" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                <path fill="currentColor" d="M49.501 8.249L38.251 20.75h-5l-11.25 12.499H17l-11.25 12.5V2H2v60h60V8.249H49.501M27.626 56.375h-9.688V35.124h9.688v21.251m16.25 0h-9.688v-33.75h9.688v33.75m16.249 0h-9.687V10.124h9.687v46.251"/>
               </svg>
               Traffic Source
             </Link>
