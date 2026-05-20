@@ -13,9 +13,9 @@ Use the upstream repository if you want the stock VPS/Railway + SQLite deploymen
 
 This repository is a community fork. Deploy your own instance — see [DEPLOY.md](./DEPLOY.md). There is no bundled demo or hosted analytics service in this codebase.
 
-### Additions in this fork
+### Additions in the Cloudflare edition
 
-| Area | Upstream | This fork |
+| Area | Upstream | Cloudflare edition |
 |------|----------|-----------|
 | Hosting | VPS, Railway, Node `npm start` | **Cloudflare Workers** via OpenNext |
 | Database | SQLite file (`better-sqlite3`) | **Cloudflare D1** + optional SQLite for local dev |
@@ -25,4 +25,4 @@ This repository is a community fork. Deploy your own instance — see [DEPLOY.md
 | Encryption key | `data/.appkey` on disk | **`APP_ENCRYPTION_KEY`** Wrangler secret on Cloudflare |
 | Deploy | PM2 / Railway | `npm run deploy` (Wrangler) — see [DEPLOY.md](./DEPLOY.md) |
 
-Core product features (analytics, Stripe sync, affiliates, GSC UI, tracking script) come from Traffic Source; Cloudflare support is added in this fork without replacing the original deployment paths where possible.
+Core product features (analytics, Stripe sync, affiliates, GSC UI, tracking script) come from Traffic Source; Cloudflare support is added here without replacing the original VPS/SQLite deployment path.

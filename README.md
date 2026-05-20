@@ -46,7 +46,7 @@ You can still run the app exactly like upstream on SQLite; set `DATABASE_DRIVER`
 ## Tech Stack
 
 - **Framework:** Next.js 16 + React 19
-- **Database:** SQLite (`better-sqlite3`) *or* **Cloudflare D1** (this fork)
+- **Database:** SQLite (`better-sqlite3`) *or* **Cloudflare D1**
 - **Hosting:** VPS + PM2, Railway, or **Cloudflare Workers** (OpenNext)
 - **Payments:** Stripe API (polling-based, no webhooks)
 - **Auth:** JWT with httpOnly cookies
@@ -178,7 +178,7 @@ pm2 save
 
 The included deploy script pulls latest changes, builds in a temp directory, swaps atomically, and restarts PM2:
 
-> **Note:** `npm run deploy` in this fork runs **OpenNext + Wrangler** (Cloudflare). On VPS, use `npm run build && pm2 restart trafficsource` or `scripts/deploy.sh`.
+> **Note:** `npm run deploy` runs **OpenNext + Wrangler** (Cloudflare). On VPS, use `npm run build && pm2 restart trafficsource` or `scripts/deploy.sh`.
 
 ### Nginx reverse proxy
 
@@ -261,7 +261,7 @@ You need a Google Cloud OAuth client. Anyone using this instance shares the same
 | Deployment | Key storage |
 |------------|-------------|
 | VPS / Railway (upstream) | Auto-generated `data/.appkey` (back up with the database) |
-| Cloudflare (this fork) | Wrangler secret `APP_ENCRYPTION_KEY` (`openssl rand -hex 32`) |
+| Cloudflare Workers | Wrangler secret `APP_ENCRYPTION_KEY` (`openssl rand -hex 32`) |
 
 ### Linking a site
 
@@ -306,7 +306,7 @@ Traffic Source uses SQLite with WAL mode. The database file lives at `DATABASE_P
 cp ./data/analytics.db ./data/analytics-backup-$(date +%Y%m%d).db
 ```
 
-### Cloudflare D1 (this fork)
+### Cloudflare D1
 
 Schema lives in `d1/migrations/`. Apply with:
 
@@ -367,6 +367,10 @@ All users share one D1 database; **sites, analytics, and affiliates are scoped b
 | `npm run build` / `npm start` | VPS / Railway production |
 | `npm run deploy` | **Cloudflare** — OpenNext build + `wrangler deploy` |
 | `npm run preview` | Local Workers runtime + D1 |
+
+## Configuration privacy
+
+Do **not** commit `wrangler.jsonc` or `.dev.vars` — they contain your domain, D1 database ID, and secrets. Use `wrangler.jsonc.example` as a template (both are gitignored or example-only).
 
 ## License
 
