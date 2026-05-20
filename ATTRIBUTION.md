@@ -13,7 +13,7 @@ Use the upstream repository if you want the stock VPS/Railway + SQLite deploymen
 
 **Repository:** https://github.com/Dev-Muhammad-Junaid/traffic-source  
 
-**Maintainer / deployment:** Example — https://analytics.example.com
+Deploy your own instance — see [DEPLOY.md](./DEPLOY.md). No public demo URL is bundled with this repo.
 
 ### Additions in this fork
 

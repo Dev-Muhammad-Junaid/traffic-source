@@ -54,18 +54,6 @@ You can still run the app exactly like upstream on SQLite; set `DATABASE_DRIVER`
 - **Styling:** SASS
 - **Charts:** Recharts
 
-## Hosted instance (Example)
-
-Example **Cloudflare edition** deployment (multi-tenant):
-
-| | |
-|---|---|
-| **URL** | https://analytics.example.com |
-| **Sign up** | https://analytics.example.com/register |
-| **Database** | Cloudflare D1 (shared; data isolated per user account) |
-
-Create an account, add your site, and paste the tracking snippet. Your analytics are private to your login — other users on the same instance cannot see your sites.
-
 ## Quick Start
 
 ### Option 1: Deploy on Cloudflare (Workers + D1) — this fork
@@ -75,6 +63,8 @@ Serverless hosting on Cloudflare — no VPS. Full guide: **[DEPLOY.md](./DEPLOY.
 ```bash
 git clone https://github.com/Dev-Muhammad-Junaid/traffic-source.git
 cd traffic-source
+cp wrangler.jsonc.example wrangler.jsonc
+# Edit wrangler.jsonc (URL, domain, ALLOW_REGISTRATION)
 npm install
 npx wrangler d1 create traffic-source-db
 # Add database_id to wrangler.jsonc, then:

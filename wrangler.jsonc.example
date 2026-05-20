@@ -1,5 +1,5 @@
 // Traffic Source — Cloudflare edition (fork of github.com/mddanishyusuf/traffic-source)
-// Deploy: npm run deploy | Docs: DEPLOY.md
+// Copy to wrangler.jsonc and fill in your values: cp wrangler.jsonc.example wrangler.jsonc
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
@@ -12,7 +12,7 @@
 	"vars": {
 		"DATABASE_DRIVER": "d1",
 		"NEXT_PUBLIC_APP_URL": "https://analytics.example.com",
-		"ALLOW_REGISTRATION": "true"
+		"ALLOW_REGISTRATION": "false"
 	},
 	"d1_databases": [
 		{
