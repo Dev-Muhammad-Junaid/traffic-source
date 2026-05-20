@@ -1,12 +1,33 @@
-# Traffic Source
+# Traffic Source — Cloudflare Edition
 
-Open-source, self-hosted web analytics with conversion tracking and affiliate management. Deploy on a $4 VPS, own your data forever.
+> **Fork of [Traffic Source](https://github.com/mddanishyusuf/traffic-source)** with first-class support for **Cloudflare Workers**, **D1**, and **OpenNext**.
+
+Open-source, self-hosted web analytics with conversion tracking and affiliate management. Deploy on Cloudflare (serverless), a $4 VPS, or Railway — own your data forever.
 
 **No monthly fees. No data sharing. No limits.**
 
 ![Traffic Source Dashboard](demo-image.png)
 
-Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web Scraper](https://nocodewebscraper.com) · [CrawlAPI](https://crawlapi.dev) · [MailLayer](https://maillayer.com) · [ClickDash](https://clickdash.io)
+| | |
+|---|---|
+| **This fork** | https://github.com/Dev-Muhammad-Junaid/traffic-source |
+| **Upstream** | https://github.com/mddanishyusuf/traffic-source |
+| **Cloudflare deploy guide** | [DEPLOY.md](./DEPLOY.md) |
+| **What changed vs upstream** | [ATTRIBUTION.md](./ATTRIBUTION.md) |
+
+Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web Scraper](https://nocodewebscraper.com) · [CrawlAPI](https://crawlapi.dev) · [MailLayer](https://maillayer.com) · [ClickDash](https://clickdash.io) (original Traffic Source)
+
+## About this fork
+
+The [original Traffic Source](https://github.com/mddanishyusuf/traffic-source) targets Node.js hosting with a local **SQLite** database and background workers via `setInterval`. **This repository keeps that stack** for VPS/Railway/local dev and **adds a Cloudflare path**:
+
+- **Workers + D1** — no VPS; database is Cloudflare D1
+- **OpenNext** — Next.js 16 on the Workers runtime
+- **Cron HTTP endpoints** — Stripe sync, aggregation, GSC sync, backups (Workers have no long-lived `setInterval`)
+- **`ctx.waitUntil()`** — GSC initial backfill after linking a property
+- **`ALLOW_REGISTRATION`** — optional multi-tenant sign-up on a shared instance
+
+You can still run the app exactly like upstream on SQLite; set `DATABASE_DRIVER` unset (or omit) and use `npm run dev` / `npm start`.
 
 ## Features
 
@@ -20,13 +41,13 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 - **Visitor Journeys** — Full session replay showing every page a visitor viewed before converting
 - **Multi-site** — Track multiple websites from a single dashboard
 - **Lightweight Script** — ~3KB tracking snippet with SPA support (pushState/popstate)
-- **Privacy-first** — No cookies for tracking, all data stays on your server
-- **SQLite** — Zero-config database, no external services needed
+- **Privacy-first** — No cookies for tracking, all data stays on your infrastructure
+- **SQLite or D1** — SQLite on VPS/Railway; **Cloudflare D1** on Workers
 
 ## Tech Stack
 
 - **Framework:** Next.js 16 + React 19
-- **Database:** SQLite (local/VPS) or **Cloudflare D1** (Workers)
+- **Database:** SQLite (`better-sqlite3`) *or* **Cloudflare D1** (this fork)
 - **Hosting:** VPS + PM2, Railway, or **Cloudflare Workers** (OpenNext)
 - **Payments:** Stripe API (polling-based, no webhooks)
 - **Auth:** JWT with httpOnly cookies
@@ -35,7 +56,7 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 
 ## Hosted instance (Example)
 
-A shared, multi-tenant deployment is live for anyone to use:
+Example **Cloudflare edition** deployment (multi-tenant):
 
 | | |
 |---|---|
@@ -47,7 +68,7 @@ Create an account, add your site, and paste the tracking snippet. Your analytics
 
 ## Quick Start
 
-### Option 1: Deploy on Cloudflare (Workers + D1)
+### Option 1: Deploy on Cloudflare (Workers + D1) — this fork
 
 Serverless hosting on Cloudflare — no VPS. Full guide: **[DEPLOY.md](./DEPLOY.md)**.
 
@@ -72,15 +93,19 @@ npm run deploy
 
 **Single-tenant (first user only):** omit or set `"ALLOW_REGISTRATION": "false"`.
 
-On D1/Workers, background jobs use HTTP cron (not `setInterval`). Configure cron hits for `stripe-sync`, `aggregate`, `gsc-sync`, and `backup` — see DEPLOY.md.
+On D1/Workers, background jobs use HTTP cron (not `setInterval`). Configure cron hits for `stripe-sync`, `aggregate`, `gsc-sync`, and `backup` — see [DEPLOY.md](./DEPLOY.md).
 
-### Option 2: One-click deploy on Railway
+### Option 2: One-click deploy on Railway (upstream-style)
 
 No VPS setup needed — deploy in one click and you're live in under a minute.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/traffic-source)
 
-### Option 3: Self-host on a VPS
+Uses SQLite; no D1/Workers configuration required. See [upstream repo](https://github.com/mddanishyusuf/traffic-source) for Railway-specific notes.
+
+### Option 3: Self-host on a VPS (upstream-style)
+
+Same as the [original Traffic Source](https://github.com/mddanishyusuf/traffic-source#option-2-self-host-on-a-vps) VPS guide.
 
 #### Prerequisites
 
@@ -91,7 +116,7 @@ No VPS setup needed — deploy in one click and you're live in under a minute.
 #### 1. Clone and install
 
 ```bash
-git clone https://github.com/mddanishyusuf/traffic-source.git
+git clone https://github.com/Dev-Muhammad-Junaid/traffic-source.git
 cd traffic-source
 npm install
 ```
@@ -111,6 +136,8 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 DATABASE_PATH=./data/analytics.db
 ```
 
+Do **not** set `DATABASE_DRIVER=d1` on VPS — leave it unset so SQLite is used.
+
 Generate a secure JWT secret:
 
 ```bash
@@ -124,7 +151,7 @@ npm run build
 npm start
 ```
 
-The app runs on port 3000 by default.
+The app runs on port 3000 by default. Background sync (Stripe, GSC) runs via `src/instrumentation.js` automatically on Node.
 
 #### 4. Set up Cloudflare proxy
 
@@ -160,9 +187,7 @@ pm2 save
 
 The included deploy script pulls latest changes, builds in a temp directory, swaps atomically, and restarts PM2:
 
-```bash
-npm run deploy
-```
+> **Note:** `npm run deploy` in this fork runs **OpenNext + Wrangler** (Cloudflare). On VPS, use `npm run build && pm2 restart trafficsource` or `scripts/deploy.sh`.
 
 ### Nginx reverse proxy
 
@@ -218,6 +243,8 @@ const session = await stripe.checkout.sessions.create({
 
 Traffic Source polls Stripe every 60 seconds and automatically matches payments to visitor sessions — no webhook setup required.
 
+On **Cloudflare**, polling is driven by the `/api/cron/stripe-sync` cron endpoint (not `setInterval`).
+
 ## Google Search Console
 
 Connect your Google Search Console once and link any site to its property with a single click. Traffic Source keeps the last 90 days of keyword data and surfaces what's actually actionable: winners, losers, opportunities, quick wins, and a keyword explorer that shows pages, countries, and devices for any single query — something GSC's own UI doesn't surface together.
@@ -238,11 +265,21 @@ You need a Google Cloud OAuth client. Anyone using this instance shares the same
 5. **Save Client ID + Client Secret in Traffic Source** — Settings → Integrations → paste both → Save
 6. **Click "Connect Google Search Console"** — authorize once, done
 
-Credentials and refresh tokens are encrypted at rest with AES-256-GCM. The encryption key is auto-generated on first use and stored in `data/.appkey` (back this up alongside the database).
+**Encryption at rest:**
+
+| Deployment | Key storage |
+|------------|-------------|
+| VPS / Railway (upstream) | Auto-generated `data/.appkey` (back up with the database) |
+| Cloudflare (this fork) | Wrangler secret `APP_ENCRYPTION_KEY` (`openssl rand -hex 32`) |
 
 ### Linking a site
 
-On any site → **Search Console** tab → pick the matching property → backfill runs in the background. From then on, sync runs hourly (each site throttled to once per 12h).
+On any site → **Search Console** tab → pick the matching property → backfill runs in the background.
+
+| Deployment | How sync runs |
+|------------|----------------|
+| VPS / Railway | `setInterval` in `instrumentation.js` (hourly) |
+| Cloudflare | `waitUntil` on link + `/api/cron/gsc-sync` (configure hourly cron) |
 
 ## Affiliate System
 
@@ -260,15 +297,15 @@ When a visitor arrives via a referral link and later converts, the affiliate is 
 | `JWT_SECRET` | Yes | — | Random hex string for signing auth tokens |
 | `JWT_EXPIRY` | No | `7d` | Auth token expiry duration |
 | `NEXT_PUBLIC_APP_URL` | Yes | — | Public URL of your Traffic Source instance |
-| `DATABASE_PATH` | No | `./data/analytics.db` | Path to SQLite database file (VPS/local) |
-| `DATABASE_DRIVER` | No | — | Set to `d1` on Cloudflare Workers |
+| `DATABASE_PATH` | VPS | `./data/analytics.db` | Path to SQLite database file |
+| `DATABASE_DRIVER` | Cloudflare | — | Set to `d1` on Cloudflare Workers |
 | `ALLOW_REGISTRATION` | No | `false` | `true` = anyone can sign up (multi-tenant) |
-| `CRON_SECRET` | No | — | Secret for protecting cron endpoints (required on Workers) |
+| `CRON_SECRET` | Cloudflare | — | Secret for protecting cron endpoints |
 | `APP_ENCRYPTION_KEY` | Cloudflare | — | Encrypts GSC/Stripe credentials in DB (Wrangler secret) |
 
 ## Database
 
-### SQLite (VPS / Railway / local)
+### SQLite (VPS / Railway / local) — upstream default
 
 Traffic Source uses SQLite with WAL mode. The database file lives at `DATABASE_PATH` and includes automatic migrations.
 
@@ -278,7 +315,7 @@ Traffic Source uses SQLite with WAL mode. The database file lives at `DATABASE_P
 cp ./data/analytics.db ./data/analytics-backup-$(date +%Y%m%d).db
 ```
 
-### Cloudflare D1 (Workers)
+### Cloudflare D1 (this fork)
 
 Schema lives in `d1/migrations/`. Apply with:
 
@@ -297,16 +334,25 @@ All users share one D1 database; **sites, analytics, and affiliates are scoped b
 ## Project Structure
 
 ```
+├── d1/migrations/              # D1 schema (Cloudflare edition)
+├── wrangler.jsonc              # Cloudflare Worker + D1 bindings
+├── open-next.config.ts         # OpenNext for Workers
+├── DEPLOY.md                   # Cloudflare deployment guide
+├── ATTRIBUTION.md              # Upstream credit & fork changelog
 ├── public/
 │   └── t.js                    # Tracking script (served to client sites)
 ├── scripts/
-│   └── deploy.sh               # Zero-downtime deploy script
+│   ├── deploy.sh               # Zero-downtime VPS deploy (upstream)
+│   └── codemod-async-db.mjs    # D1 migration helpers
 ├── src/
 │   ├── components/             # React components
 │   ├── contexts/               # Auth, DateRange, Theme contexts
 │   ├── hooks/                  # useAnalytics, custom hooks
+│   ├── instrumentation.js      # Background sync (Node only; skipped on D1)
 │   ├── lib/
-│   │   ├── database/           # SQLite + D1 adapters (Cloudflare)
+│   │   ├── database/           # SQLite + D1 adapters (Cloudflare fork)
+│   │   ├── background-task.js  # ctx.waitUntil helper (Workers)
+│   │   ├── registration.js     # ALLOW_REGISTRATION helper
 │   │   ├── db.js               # Database connection
 │   │   ├── analytics.js        # Analytics query logic
 │   │   ├── auth.js             # JWT & password helpers
@@ -317,10 +363,20 @@ All users share one D1 database; **sites, analytics, and affiliates are scoped b
 │   │   ├── analytics/          # Dashboard pages
 │   │   └── sites/              # Site management
 │   └── styles/                 # SASS stylesheets
-├── data/                       # SQLite database directory
-└── .env.local                  # Environment config
+├── data/                       # SQLite database directory (VPS)
+├── .dev.vars.example           # Local Workers preview secrets template
+└── .env.local                  # VPS environment config
 ```
+
+## npm scripts
+
+| Script | Target |
+|--------|--------|
+| `npm run dev` | Local Next.js (SQLite) |
+| `npm run build` / `npm start` | VPS / Railway production |
+| `npm run deploy` | **Cloudflare** — OpenNext build + `wrangler deploy` |
+| `npm run preview` | Local Workers runtime + D1 |
 
 ## License
 
-MIT
+MIT — same as [upstream Traffic Source](https://github.com/mddanishyusuf/traffic-source). See upstream for original copyright holders.

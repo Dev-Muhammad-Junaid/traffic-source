@@ -1,6 +1,14 @@
 # Deploy Traffic Source to Cloudflare
 
-Analytics dashboard at **https://analytics.example.com** using Workers + OpenNext + D1.
+This guide is for the **[Cloudflare edition](https://github.com/Dev-Muhammad-Junaid/traffic-source)** of [Traffic Source](https://github.com/mddanishyusuf/traffic-source) — a fork that adds **Workers**, **D1**, and **OpenNext** while keeping the upstream VPS/SQLite path available.
+
+| | |
+|---|---|
+| **Fork repo** | https://github.com/Dev-Muhammad-Junaid/traffic-source |
+| **Upstream** | https://github.com/mddanishyusuf/traffic-source |
+| **Fork vs upstream** | [ATTRIBUTION.md](./ATTRIBUTION.md) |
+
+**Example live deployment:** https://analytics.example.com (Workers + OpenNext + D1).
 
 ## Prerequisites
 

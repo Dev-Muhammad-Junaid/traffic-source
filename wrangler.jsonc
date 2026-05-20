@@ -1,3 +1,5 @@
+// Traffic Source — Cloudflare edition (fork of github.com/mddanishyusuf/traffic-source)
+// Deploy: npm run deploy | Docs: DEPLOY.md
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
