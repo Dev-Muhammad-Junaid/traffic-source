@@ -1,25 +1,24 @@
 # Traffic Source — Cloudflare Edition
 
-> **Fork of [Traffic Source](https://github.com/mddanishyusuf/traffic-source)** with first-class support for **Cloudflare Workers**, **D1**, and **OpenNext**.
+Community fork of [Traffic Source](https://github.com/mddanishyusuf/traffic-source) with **Cloudflare Workers**, **D1**, and **OpenNext**. Deploy your own private analytics instance — no vendor lock-in.
 
-Open-source, self-hosted web analytics with conversion tracking and affiliate management. Deploy on Cloudflare (serverless), a $4 VPS, or Railway — own your data forever.
+Open-source, self-hosted web analytics with conversion tracking and affiliate management. Run on Cloudflare (serverless), a VPS, or Railway.
 
 **No monthly fees. No data sharing. No limits.**
 
 ![Traffic Source Dashboard](demo-image.png)
 
-| | |
-|---|---|
-| **This fork** | https://github.com/Dev-Muhammad-Junaid/traffic-source |
-| **Upstream** | https://github.com/mddanishyusuf/traffic-source |
-| **Cloudflare deploy guide** | [DEPLOY.md](./DEPLOY.md) |
-| **What changed vs upstream** | [ATTRIBUTION.md](./ATTRIBUTION.md) |
+| Resource | Link |
+|----------|------|
+| Original project | [mddanishyusuf/traffic-source](https://github.com/mddanishyusuf/traffic-source) |
+| Cloudflare deploy guide | [DEPLOY.md](./DEPLOY.md) |
+| Changes vs upstream | [ATTRIBUTION.md](./ATTRIBUTION.md) |
 
-Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web Scraper](https://nocodewebscraper.com) · [CrawlAPI](https://crawlapi.dev) · [MailLayer](https://maillayer.com) · [ClickDash](https://clickdash.io) (original Traffic Source)
+Original Traffic Source is built by the [SuperDevPro](https://superdevpro.com) team.
 
-## About this fork
+## About this project
 
-The [original Traffic Source](https://github.com/mddanishyusuf/traffic-source) targets Node.js hosting with a local **SQLite** database and background workers via `setInterval`. **This repository keeps that stack** for VPS/Railway/local dev and **adds a Cloudflare path**:
+[Traffic Source](https://github.com/mddanishyusuf/traffic-source) targets Node.js with **SQLite** and background workers via `setInterval`. **This repo keeps that path** for VPS/Railway/local dev and **adds Cloudflare**:
 
 - **Workers + D1** — no VPS; database is Cloudflare D1
 - **OpenNext** — Next.js 16 on the Workers runtime
@@ -56,12 +55,12 @@ You can still run the app exactly like upstream on SQLite; set `DATABASE_DRIVER`
 
 ## Quick Start
 
-### Option 1: Deploy on Cloudflare (Workers + D1) — this fork
+### Option 1: Deploy on Cloudflare (Workers + D1)
 
 Serverless hosting on Cloudflare — no VPS. Full guide: **[DEPLOY.md](./DEPLOY.md)**.
 
 ```bash
-git clone https://github.com/Dev-Muhammad-Junaid/traffic-source.git
+git clone https://github.com/YOUR_ORG/traffic-source.git
 cd traffic-source
 cp wrangler.jsonc.example wrangler.jsonc
 # Edit wrangler.jsonc (URL, domain, ALLOW_REGISTRATION)
@@ -106,10 +105,12 @@ Same as the [original Traffic Source](https://github.com/mddanishyusuf/traffic-s
 #### 1. Clone and install
 
 ```bash
-git clone https://github.com/Dev-Muhammad-Junaid/traffic-source.git
+git clone https://github.com/mddanishyusuf/traffic-source.git
 cd traffic-source
 npm install
 ```
+
+Or clone this Cloudflare edition and follow the Cloudflare section above.
 
 #### 2. Configure environment
 

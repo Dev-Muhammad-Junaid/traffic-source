@@ -3,14 +3,7 @@
   "version": "0.1.0",
   "description": "Cloudflare Workers + D1 fork of Traffic Source — self-hosted web analytics with conversion tracking and affiliates.",
   "private": true,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Dev-Muhammad-Junaid/traffic-source.git"
-  },
-  "homepage": "https://github.com/Dev-Muhammad-Junaid/traffic-source#readme",
-  "bugs": {
-    "url": "https://github.com/Dev-Muhammad-Junaid/traffic-source/issues"
-  },
+  "license": "MIT",
   "engines": {
     "node": ">=20"
   },

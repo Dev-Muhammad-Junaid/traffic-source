@@ -9,11 +9,9 @@ This repository is a **fork and extension** of [Traffic Source](https://github.c
 
 Use the upstream repository if you want the stock VPS/Railway + SQLite deployment without Cloudflare-specific changes.
 
-## This fork (Cloudflare edition)
+## Cloudflare edition
 
-**Repository:** https://github.com/Dev-Muhammad-Junaid/traffic-source  
-
-Deploy your own instance — see [DEPLOY.md](./DEPLOY.md). No public demo URL is bundled with this repo.
+This repository is a community fork. Deploy your own instance — see [DEPLOY.md](./DEPLOY.md). There is no bundled demo or hosted analytics service in this codebase.
 
 ### Additions in this fork
 

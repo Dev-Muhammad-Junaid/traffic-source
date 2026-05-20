@@ -1,12 +1,8 @@
 # Deploy Traffic Source to Cloudflare
 
-This guide is for the **[Cloudflare edition](https://github.com/Dev-Muhammad-Junaid/traffic-source)** of [Traffic Source](https://github.com/mddanishyusuf/traffic-source) — a fork that adds **Workers**, **D1**, and **OpenNext** while keeping the upstream VPS/SQLite path available.
+Deploy the **Cloudflare edition** of [Traffic Source](https://github.com/mddanishyusuf/traffic-source) — **Workers**, **D1**, and **OpenNext**, while keeping the upstream VPS/SQLite path available.
 
-| | |
-|---|---|
-| **Fork repo** | https://github.com/Dev-Muhammad-Junaid/traffic-source |
-| **Upstream** | https://github.com/mddanishyusuf/traffic-source |
-| **Fork vs upstream** | [ATTRIBUTION.md](./ATTRIBUTION.md) |
+See [ATTRIBUTION.md](./ATTRIBUTION.md) for how this differs from upstream.
 
 ## Prerequisites
 
