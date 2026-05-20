@@ -2,8 +2,8 @@ import { withAuth } from '@/lib/withAuth';
 import { getGscCredentials, getRedirectUri, buildAuthUrl } from '@/lib/gsc';
 import crypto from 'crypto';
 
-export default withAuth(function handler(req, res) {
-  const { clientId } = getGscCredentials();
+export default withAuth(async function handler(req, res) {
+  const { clientId } = await getGscCredentials();
   if (!clientId) return res.status(400).json({ error: 'Add OAuth credentials first.' });
 
   const state = crypto.randomBytes(16).toString('hex') + '.' + req.user.userId;

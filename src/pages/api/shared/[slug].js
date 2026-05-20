@@ -1,15 +1,15 @@
 import { getDb } from '@/lib/db';
 import { parseDateRange } from '@/lib/analytics';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { slug } = req.query;
-  const db = getDb();
+  const db = await getDb();
 
-  const site = db
+  const site = await db
     .prepare('SELECT * FROM sites WHERE public_slug = ? AND is_public = 1')
     .get(slug);
 
@@ -32,7 +32,7 @@ export default function handler(req, res) {
     to: new Date(fromDate.getTime() - 86400000).toISOString().slice(0, 10),
   };
 
-  const current = db
+  const current = await db
     .prepare(
       `SELECT
         COALESCE(SUM(visitors), 0) as total_visitors,
@@ -45,7 +45,7 @@ export default function handler(req, res) {
     )
     .get(siteId, range.from, range.to);
 
-  const previous = db
+  const previous = await db
     .prepare(
       `SELECT
         COALESCE(SUM(visitors), 0) as total_visitors,
@@ -90,7 +90,7 @@ export default function handler(req, res) {
   }
 
   // Sources
-  const sources = db
+  const sources = await db
     .prepare(
       `SELECT COALESCE(utm_source, referrer_domain, 'Direct') as name,
         COUNT(*) as sessions, COUNT(DISTINCT visitor_id) as visitors
@@ -101,7 +101,7 @@ export default function handler(req, res) {
     .all(siteId, range.from, dateEnd);
 
   // Pages
-  const pages = db
+  const pages = await db
     .prepare(
       `SELECT pathname as name, COUNT(*) as views
        FROM page_views
@@ -111,7 +111,7 @@ export default function handler(req, res) {
     .all(siteId, range.from, dateEnd);
 
   // Countries
-  const countries = db
+  const countries = await db
     .prepare(
       `SELECT country as name, COUNT(*) as count
        FROM sessions
@@ -122,7 +122,7 @@ export default function handler(req, res) {
     .all(siteId, range.from, dateEnd);
 
   // Browsers
-  const browsers = db
+  const browsers = await db
     .prepare(
       `SELECT browser as name, COUNT(*) as count
        FROM sessions
@@ -133,7 +133,7 @@ export default function handler(req, res) {
     .all(siteId, range.from, dateEnd);
 
   // OS
-  const os = db
+  const os = await db
     .prepare(
       `SELECT os as name, COUNT(*) as count
        FROM sessions
@@ -144,7 +144,7 @@ export default function handler(req, res) {
     .all(siteId, range.from, dateEnd);
 
   // Devices
-  const devices = db
+  const devices = await db
     .prepare(
       `SELECT device_type as name, COUNT(*) as count
        FROM sessions

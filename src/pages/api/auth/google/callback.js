@@ -18,7 +18,7 @@ export default withAuth(async function handler(req, res) {
       return redirectErr(res, 'No refresh token returned. Revoke the app in your Google account and try again.');
     }
     const email = await fetchUserEmail(tokens.access_token);
-    saveUserConnection({ userId, refreshToken: tokens.refresh_token, googleEmail: email });
+    await saveUserConnection({ userId, refreshToken: tokens.refresh_token, googleEmail: email });
     res.setHeader('Set-Cookie', 'gsc_state=; HttpOnly; Path=/; Max-Age=0');
     res.redirect('/settings?tab=integrations&connected=1');
   } catch (err) {

@@ -1,22 +1,25 @@
-import { getDb } from './db';
+import { getDb, isD1 } from './db';
 
-export function purgeOldPageViews(daysToKeep = 90) {
-  const db = getDb();
+export async function purgeOldPageViews(daysToKeep = 90) {
+  const db = await getDb();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysToKeep);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-  const result = db
+  const result = await db
     .prepare("DELETE FROM page_views WHERE date(timestamp) < ?")
     .run(cutoffStr);
 
   return { deleted: result.changes };
 }
 
-export function getDatabaseSize() {
-  const db = getDb();
-  const pageCount = db.pragma('page_count', { simple: true });
-  const pageSize = db.pragma('page_size', { simple: true });
+export async function getDatabaseSize() {
+  const db = await getDb();
+  if (isD1(db)) {
+    return { bytes: 0, mb: '0', note: 'Size metrics unavailable on D1' };
+  }
+  const pageCount = db.raw.pragma('page_count', { simple: true });
+  const pageSize = db.raw.pragma('page_size', { simple: true });
   const sizeBytes = pageCount * pageSize;
 
   return {
@@ -25,19 +28,24 @@ export function getDatabaseSize() {
   };
 }
 
-export function vacuum() {
-  const db = getDb();
-  db.exec('VACUUM');
+export async function vacuum() {
+  const db = await getDb();
+  if (isD1(db)) return;
+  await db.exec('VACUUM');
 }
 
-export function getTableCounts() {
-  const db = getDb();
+export async function getTableCounts() {
+  const db = await getDb();
+  const count = async (table) => {
+    const row = await db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get();
+    return row.count;
+  };
   return {
-    users: db.prepare('SELECT COUNT(*) as count FROM users').get().count,
-    sites: db.prepare('SELECT COUNT(*) as count FROM sites').get().count,
-    sessions: db.prepare('SELECT COUNT(*) as count FROM sessions').get().count,
-    page_views: db.prepare('SELECT COUNT(*) as count FROM page_views').get().count,
-    conversions: db.prepare('SELECT COUNT(*) as count FROM conversions').get().count,
-    daily_stats: db.prepare('SELECT COUNT(*) as count FROM daily_stats').get().count,
+    users: await count('users'),
+    sites: await count('sites'),
+    sessions: await count('sessions'),
+    page_views: await count('page_views'),
+    conversions: await count('conversions'),
+    daily_stats: await count('daily_stats'),
   };
 }

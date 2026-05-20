@@ -1,5 +1,6 @@
 import { getDb } from '@/lib/db';
 import { hashPassword, generateToken, setAuthCookie } from '@/lib/auth';
+import { isRegistrationOpen } from '@/lib/registration';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -22,14 +23,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const db = getDb();
+    const db = await getDb();
 
-    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
-    if (userCount.count > 0) {
-      return res.status(403).json({ error: 'Registration is disabled. An account already exists.' });
+    if (!isRegistrationOpen()) {
+      const userCount = await db.prepare('SELECT COUNT(*) as count FROM users').get();
+      if (userCount.count > 0) {
+        return res.status(403).json({ error: 'Registration is disabled. An account already exists.' });
+      }
     }
 
-    const existing = db
+    const existing = await db
       .prepare('SELECT id FROM users WHERE email = ?')
       .get(email.toLowerCase());
     if (existing) {
@@ -38,7 +41,7 @@ export default async function handler(req, res) {
 
     const passwordHash = await hashPassword(password);
 
-    const result = db
+    const result = await db
       .prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)')
       .run(email.toLowerCase(), passwordHash, name || null);
 

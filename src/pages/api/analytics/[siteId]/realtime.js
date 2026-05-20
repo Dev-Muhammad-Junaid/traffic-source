@@ -2,19 +2,19 @@ import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 import { verifySiteOwnership } from '@/lib/analytics';
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { siteId } = req.query;
-  const site = verifySiteOwnership(siteId, req.user.userId);
+  const site = await verifySiteOwnership(siteId, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const db = getDb();
+  const db = await getDb();
 
   // Active visitors: most recent session per visitor with last_activity within 5 minutes
-  const activeUsers = db
+  const activeUsers = await db
     .prepare(
       `SELECT s.visitor_id, s.country, s.browser, s.device_type,
               s.exit_page as current_page, s.last_activity,

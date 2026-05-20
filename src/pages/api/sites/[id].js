@@ -1,11 +1,11 @@
 import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 
-export default withAuth(function handler(req, res) {
-  const db = getDb();
+export default withAuth(async function handler(req, res) {
+  const db = await getDb();
   const { id } = req.query;
 
-  const site = db
+  const site = await db
     .prepare('SELECT * FROM sites WHERE id = ? AND user_id = ?')
     .get(id, req.user.userId);
 
@@ -30,14 +30,14 @@ export default withAuth(function handler(req, res) {
       ? domain.replace(/^https?:\/\//, '').replace(/\/+$/, '')
       : site.domain;
 
-    db.prepare('UPDATE sites SET domain = ?, name = ? WHERE id = ?').run(
+    await db.prepare('UPDATE sites SET domain = ?, name = ? WHERE id = ?').run(
       cleanDomain,
       name || site.name,
       id
     );
 
     if (stripe_secret_key !== undefined) {
-      db.prepare('UPDATE sites SET stripe_secret_key = ? WHERE id = ?').run(
+      await db.prepare('UPDATE sites SET stripe_secret_key = ? WHERE id = ?').run(
         stripe_secret_key || null,
         id
       );
@@ -52,24 +52,24 @@ export default withAuth(function handler(req, res) {
         }
         slug = slug.replace(/[^a-z0-9-]/gi, '').toLowerCase();
         // Check uniqueness
-        const existing = db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
+        const existing = await db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
         if (existing) {
           return res.status(400).json({ error: 'This slug is already taken. Please choose a different one.' });
         }
-        db.prepare('UPDATE sites SET is_public = 1, public_slug = ? WHERE id = ?').run(slug, id);
+        await db.prepare('UPDATE sites SET is_public = 1, public_slug = ? WHERE id = ?').run(slug, id);
       } else {
-        db.prepare('UPDATE sites SET is_public = 0 WHERE id = ?').run(id);
+        await db.prepare('UPDATE sites SET is_public = 0 WHERE id = ?').run(id);
       }
     } else if (public_slug !== undefined && site.is_public) {
       const slug = public_slug.replace(/[^a-z0-9-]/gi, '').toLowerCase();
-      const existing = db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
+      const existing = await db.prepare('SELECT id FROM sites WHERE public_slug = ? AND id != ?').get(slug, id);
       if (existing) {
         return res.status(400).json({ error: 'This slug is already taken. Please choose a different one.' });
       }
-      db.prepare('UPDATE sites SET public_slug = ? WHERE id = ?').run(slug, id);
+      await db.prepare('UPDATE sites SET public_slug = ? WHERE id = ?').run(slug, id);
     }
 
-    const updated = db.prepare('SELECT * FROM sites WHERE id = ?').get(id);
+    const updated = await db.prepare('SELECT * FROM sites WHERE id = ?').get(id);
     const maskedUpdated = { ...updated };
     if (maskedUpdated.stripe_secret_key) {
       maskedUpdated.stripe_secret_key = '••••' + maskedUpdated.stripe_secret_key.slice(-4);
@@ -81,7 +81,7 @@ export default withAuth(function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    db.prepare('DELETE FROM sites WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM sites WHERE id = ?').run(id);
     return res.status(200).json({ success: true });
   }
 

@@ -22,17 +22,17 @@ export function parseDateRange(query) {
   };
 }
 
-export function verifySiteOwnership(siteId, userId) {
-  const db = getDb();
-  return db
+export async function verifySiteOwnership(siteId, userId) {
+  const db = await getDb();
+  return await db
     .prepare('SELECT * FROM sites WHERE id = ? AND user_id = ?')
     .get(siteId, userId);
 }
 
-export function getBreakdown(siteId, dateRange, table, groupField, limit = 20) {
-  const db = getDb();
+export async function getBreakdown(siteId, dateRange, table, groupField, limit = 20) {
+  const db = await getDb();
   const timeField = table === 'sessions' ? 'started_at' : 'timestamp';
-  return db
+  return await db
     .prepare(
       `SELECT ${groupField} as name, COUNT(*) as count
        FROM ${table}

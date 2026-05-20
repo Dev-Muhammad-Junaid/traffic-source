@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 import { parseDateRange } from '@/lib/analytics';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -9,9 +9,9 @@ export default function handler(req, res) {
   const { token } = req.query;
   if (!token) return res.status(400).json({ error: 'Token required' });
 
-  const db = getDb();
+  const db = await getDb();
 
-  const affiliate = db
+  const affiliate = await db
     .prepare('SELECT a.*, s.name as site_name, s.domain as site_domain FROM affiliates a JOIN sites s ON s.id = a.site_id WHERE a.share_token = ?')
     .get(token);
 
@@ -20,7 +20,7 @@ export default function handler(req, res) {
   const range = parseDateRange(req.query);
   const dateEnd = range.to + ' 23:59:59';
 
-  const stats = db
+  const stats = await db
     .prepare(
       `SELECT COUNT(*) as visits, COUNT(DISTINCT visitor_id) as unique_visitors
        FROM affiliate_visits
@@ -28,7 +28,7 @@ export default function handler(req, res) {
     )
     .get(affiliate.id, range.from, dateEnd);
 
-  const convStats = db
+  const convStats = await db
     .prepare(
       `SELECT COUNT(*) as conversions, COALESCE(SUM(amount), 0) as revenue
        FROM conversions
@@ -37,7 +37,7 @@ export default function handler(req, res) {
     )
     .get(affiliate.id, range.from, dateEnd);
 
-  const visitTimeSeries = db
+  const visitTimeSeries = await db
     .prepare(
       `SELECT date(landed_at) as date, COUNT(*) as visits, COUNT(DISTINCT visitor_id) as unique_visitors
        FROM affiliate_visits
@@ -46,7 +46,7 @@ export default function handler(req, res) {
     )
     .all(affiliate.id, range.from, dateEnd);
 
-  const landingPages = db
+  const landingPages = await db
     .prepare(
       `SELECT landing_page as name, COUNT(*) as count
        FROM affiliate_visits

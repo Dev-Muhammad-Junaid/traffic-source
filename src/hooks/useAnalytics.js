@@ -32,8 +32,15 @@ export function useAnalytics(endpoint, extraParams = {}) {
       const res = await fetch(
         `/api/analytics/${siteId}/${endpoint}?${params}`
       );
-      if (!res.ok) throw new Error('Failed to fetch');
-      setData(await res.json());
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(res.ok ? 'Invalid response' : (text.slice(0, 80) || 'Failed to fetch'));
+      }
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch');
+      setData(json);
     } catch (err) {
       setError(err.message);
     } finally {

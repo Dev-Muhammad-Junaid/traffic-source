@@ -2,9 +2,9 @@ import Stripe from 'stripe';
 import { getDb } from './db';
 
 export async function syncStripePayments() {
-  const db = getDb();
+  const db = await getDb();
 
-  const sites = db
+  const sites = await db
     .prepare('SELECT id, stripe_secret_key FROM sites WHERE stripe_secret_key IS NOT NULL')
     .all();
 
@@ -15,8 +15,6 @@ export async function syncStripePayments() {
 
   for (const site of sites) {
     const stripe = new Stripe(site.stripe_secret_key);
-
-    // Poll completed checkout sessions from the last 24 hours
     const since = Math.floor(Date.now() / 1000) - 86400;
 
     try {
@@ -31,17 +29,14 @@ export async function syncStripePayments() {
 
         const paymentIntentId = session.payment_intent || session.id;
 
-        // Dedup: skip if already processed
-        const existing = db
+        const existing = await db
           .prepare('SELECT id FROM conversions WHERE payment_intent_id = ? AND site_id = ?')
           .get(paymentIntentId, site.id);
         if (existing) continue;
 
-        // Extract visitor/session IDs from metadata
         let visitorId = session.metadata?.ts_visitor_id || null;
         let sessionId = session.metadata?.ts_session_id || null;
 
-        // Fallback: try client_reference_id (legacy format: visitorId|sessionId|siteId)
         if (!visitorId && session.client_reference_id) {
           const parts = session.client_reference_id.split('|');
           if (parts.length === 3) {
@@ -50,14 +45,13 @@ export async function syncStripePayments() {
           }
         }
 
-        // Look up session data for UTM/referrer attribution
         let utmSource = null;
         let utmMedium = null;
         let utmCampaign = null;
         let referrerDomain = null;
 
         if (sessionId) {
-          const origSession = db
+          const origSession = await db
             .prepare('SELECT * FROM sessions WHERE id = ?')
             .get(sessionId);
           if (origSession) {
@@ -68,9 +62,8 @@ export async function syncStripePayments() {
           }
         }
 
-        // Fallback: find most recent session by visitor_id
         if (!utmSource && visitorId) {
-          const recentSession = db
+          const recentSession = await db
             .prepare('SELECT * FROM sessions WHERE visitor_id = ? ORDER BY started_at DESC LIMIT 1')
             .get(visitorId);
           if (recentSession) {
@@ -85,16 +78,15 @@ export async function syncStripePayments() {
         const amount = session.amount_total || 0;
         const currency = session.currency || 'usd';
 
-        // Look up affiliate attribution for this visitor
         let affiliateId = null;
         if (visitorId) {
-          const affiliateVisit = db
+          const affiliateVisit = await db
             .prepare('SELECT affiliate_id FROM affiliate_visits WHERE visitor_id = ? AND site_id = ? ORDER BY landed_at DESC LIMIT 1')
             .get(visitorId, site.id);
           if (affiliateVisit) affiliateId = affiliateVisit.affiliate_id;
         }
 
-        db.prepare(
+        await db.prepare(
           `INSERT OR IGNORE INTO conversions (
             site_id, session_id, visitor_id, stripe_event_id,
             stripe_customer_id, stripe_customer_email, payment_intent_id,
@@ -122,7 +114,6 @@ export async function syncStripePayments() {
         totalProcessed++;
       }
 
-      // Poll for refunds
       const charges = await stripe.charges.list({
         created: { gte: since },
         limit: 100,
@@ -130,7 +121,7 @@ export async function syncStripePayments() {
 
       for (const charge of charges.data) {
         if (!charge.refunded) continue;
-        const updated = db
+        const updated = await db
           .prepare("UPDATE conversions SET status = 'refunded' WHERE payment_intent_id = ? AND site_id = ? AND status = 'completed'")
           .run(charge.payment_intent, site.id);
         if (updated.changes > 0) totalRefunds++;

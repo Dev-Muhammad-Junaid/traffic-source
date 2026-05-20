@@ -26,21 +26,61 @@ Built by the team behind [SuperDevPro](https://superdevpro.com) · [NoCode Web S
 ## Tech Stack
 
 - **Framework:** Next.js 16 + React 19
-- **Database:** SQLite (better-sqlite3) with WAL mode
+- **Database:** SQLite (local/VPS) or **Cloudflare D1** (Workers)
+- **Hosting:** VPS + PM2, Railway, or **Cloudflare Workers** (OpenNext)
 - **Payments:** Stripe API (polling-based, no webhooks)
 - **Auth:** JWT with httpOnly cookies
 - **Styling:** SASS
 - **Charts:** Recharts
 
+## Hosted instance (Example)
+
+A shared, multi-tenant deployment is live for anyone to use:
+
+| | |
+|---|---|
+| **URL** | https://analytics.example.com |
+| **Sign up** | https://analytics.example.com/register |
+| **Database** | Cloudflare D1 (shared; data isolated per user account) |
+
+Create an account, add your site, and paste the tracking snippet. Your analytics are private to your login — other users on the same instance cannot see your sites.
+
 ## Quick Start
 
-### Option 1: One-click deploy on Railway
+### Option 1: Deploy on Cloudflare (Workers + D1)
+
+Serverless hosting on Cloudflare — no VPS. Full guide: **[DEPLOY.md](./DEPLOY.md)**.
+
+```bash
+git clone https://github.com/Dev-Muhammad-Junaid/traffic-source.git
+cd traffic-source
+npm install
+npx wrangler d1 create traffic-source-db
+# Add database_id to wrangler.jsonc, then:
+npx wrangler d1 migrations apply traffic-source-db --remote
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put APP_ENCRYPTION_KEY
+npx wrangler secret put CRON_SECRET
+npm run deploy
+```
+
+**Multi-tenant (open registration):** set in `wrangler.jsonc` `vars`:
+
+```jsonc
+"ALLOW_REGISTRATION": "true"
+```
+
+**Single-tenant (first user only):** omit or set `"ALLOW_REGISTRATION": "false"`.
+
+On D1/Workers, background jobs use HTTP cron (not `setInterval`). Configure cron hits for `stripe-sync`, `aggregate`, `gsc-sync`, and `backup` — see DEPLOY.md.
+
+### Option 2: One-click deploy on Railway
 
 No VPS setup needed — deploy in one click and you're live in under a minute.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/traffic-source)
 
-### Option 2: Self-host on a VPS
+### Option 3: Self-host on a VPS
 
 #### Prerequisites
 
@@ -95,7 +135,10 @@ The app runs on port 3000 by default.
 
 #### 5. First login
 
-Visit your domain and register. Only the first user can register — after that, registration is disabled.
+Visit your domain and register.
+
+- **Default:** only the **first** user can register; then registration closes.
+- **Shared instance:** set `ALLOW_REGISTRATION=true` in your environment so anyone can sign up (each user’s sites stay isolated).
 
 ## Production Deployment (VPS)
 
@@ -217,18 +260,39 @@ When a visitor arrives via a referral link and later converts, the affiliate is 
 | `JWT_SECRET` | Yes | — | Random hex string for signing auth tokens |
 | `JWT_EXPIRY` | No | `7d` | Auth token expiry duration |
 | `NEXT_PUBLIC_APP_URL` | Yes | — | Public URL of your Traffic Source instance |
-| `DATABASE_PATH` | No | `./data/analytics.db` | Path to SQLite database file |
-| `CRON_SECRET` | No | — | Secret for protecting cron endpoints |
+| `DATABASE_PATH` | No | `./data/analytics.db` | Path to SQLite database file (VPS/local) |
+| `DATABASE_DRIVER` | No | — | Set to `d1` on Cloudflare Workers |
+| `ALLOW_REGISTRATION` | No | `false` | `true` = anyone can sign up (multi-tenant) |
+| `CRON_SECRET` | No | — | Secret for protecting cron endpoints (required on Workers) |
+| `APP_ENCRYPTION_KEY` | Cloudflare | — | Encrypts GSC/Stripe credentials in DB (Wrangler secret) |
 
 ## Database
 
-Traffic Source uses SQLite with WAL mode — no external database to set up or maintain. The database file lives at `DATABASE_PATH` and includes automatic migrations.
+### SQLite (VPS / Railway / local)
 
-**Backup your database:**
+Traffic Source uses SQLite with WAL mode. The database file lives at `DATABASE_PATH` and includes automatic migrations.
+
+**Backup:**
 
 ```bash
 cp ./data/analytics.db ./data/analytics-backup-$(date +%Y%m%d).db
 ```
+
+### Cloudflare D1 (Workers)
+
+Schema lives in `d1/migrations/`. Apply with:
+
+```bash
+npx wrangler d1 migrations apply traffic-source-db --remote
+```
+
+**Export backup:**
+
+```bash
+npx wrangler d1 export traffic-source-db --remote --output=backup.sql
+```
+
+All users share one D1 database; **sites, analytics, and affiliates are scoped by `user_id`** so accounts cannot read each other’s data.
 
 ## Project Structure
 
@@ -242,7 +306,8 @@ cp ./data/analytics.db ./data/analytics-backup-$(date +%Y%m%d).db
 │   ├── contexts/               # Auth, DateRange, Theme contexts
 │   ├── hooks/                  # useAnalytics, custom hooks
 │   ├── lib/
-│   │   ├── db.js               # Database connection & migrations
+│   │   ├── database/           # SQLite + D1 adapters (Cloudflare)
+│   │   ├── db.js               # Database connection
 │   │   ├── analytics.js        # Analytics query logic
 │   │   ├── auth.js             # JWT & password helpers
 │   │   ├── stripe-sync.js      # Stripe payment polling

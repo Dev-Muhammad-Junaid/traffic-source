@@ -1,16 +1,16 @@
 import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const userId = req.user.userId;
 
   // Get all user's sites
-  const sites = db.prepare('SELECT id, name, domain FROM sites WHERE user_id = ?').all(userId);
+  const sites = await db.prepare('SELECT id, name, domain FROM sites WHERE user_id = ?').all(userId);
   if (sites.length === 0) {
     return res.json({ visitors: [], countries: [], recentPayments: [], activeUsers: 0, totals: {} });
   }
@@ -19,7 +19,7 @@ export default withAuth(function handler(req, res) {
   const placeholders = siteIds.map(() => '?').join(',');
 
   // Active visitors across all sites (last 5 min)
-  const activeUsers = db
+  const activeUsers = await db
     .prepare(
       `SELECT s.visitor_id, s.country, s.city, s.browser, s.device_type,
               s.exit_page as current_page, s.last_activity,
@@ -40,7 +40,7 @@ export default withAuth(function handler(req, res) {
     .all(...siteIds, ...siteIds);
 
   // Country breakdown (last 30 days)
-  const countries = db
+  const countries = await db
     .prepare(
       `SELECT country as name, COUNT(*) as count
        FROM sessions
@@ -52,7 +52,7 @@ export default withAuth(function handler(req, res) {
     .all(...siteIds);
 
   // Totals (last 30 days)
-  const totals = db
+  const totals = await db
     .prepare(
       `SELECT
         COALESCE(SUM(visitors), 0) as visitors,
@@ -65,7 +65,7 @@ export default withAuth(function handler(req, res) {
     .get(...siteIds);
 
   // Recent payments across all sites
-  const recentPayments = db
+  const recentPayments = await db
     .prepare(
       `SELECT c.id, c.amount, c.created_at, c.stripe_customer_email,
               s.name as site_name, s.domain as site_domain,

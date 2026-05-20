@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local OpenNext preview (wrangler secrets)
+JWT_SECRET=generate_with_openssl_rand_hex_32
+JWT_EXPIRY=7d
+NEXT_PUBLIC_APP_URL=http://localhost:8787
+CRON_SECRET=generate_random_string
+APP_ENCRYPTION_KEY=generate_with_openssl_rand_hex_32
+DATABASE_DRIVER=d1
+# Set to true for a shared instance where anyone can sign up
+ALLOW_REGISTRATION=false

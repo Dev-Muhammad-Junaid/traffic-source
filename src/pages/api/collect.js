@@ -9,7 +9,7 @@ export const config = {
   },
 };
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -24,9 +24,9 @@ export default function handler(req, res) {
       return res.status(400).end();
     }
 
-    const db = getDb();
+    const db = await getDb();
 
-    const site = db.prepare('SELECT id FROM sites WHERE id = ?').get(data.site_id);
+    const site = await db.prepare('SELECT id FROM sites WHERE id = ?').get(data.site_id);
     if (!site) {
       return res.status(404).end();
     }
@@ -57,12 +57,12 @@ export default function handler(req, res) {
           ? 'tablet'
           : 'desktop');
 
-    const existingSession = db
+    const existingSession = await db
       .prepare('SELECT id, page_count FROM sessions WHERE id = ?')
       .get(data.session_id);
 
     if (!existingSession) {
-      db.prepare(
+      await db.prepare(
         `INSERT INTO sessions (
           id, site_id, visitor_id, entry_page, exit_page,
           referrer, referrer_domain, utm_source, utm_medium, utm_campaign,
@@ -95,7 +95,7 @@ export default function handler(req, res) {
         data.screen_height || null
       );
     } else {
-      db.prepare(
+      await db.prepare(
         `UPDATE sessions SET
           exit_page = ?,
           last_activity = datetime('now'),
@@ -106,17 +106,16 @@ export default function handler(req, res) {
       ).run(data.pathname, data.session_id);
     }
 
-    // Affiliate tracking
     if (data.ref) {
-      const affiliate = db
+      const affiliate = await db
         .prepare('SELECT id FROM affiliates WHERE site_id = ? AND slug = ?')
         .get(data.site_id, data.ref);
       if (affiliate) {
-        const alreadyTracked = db
+        const alreadyTracked = await db
           .prepare('SELECT id FROM affiliate_visits WHERE affiliate_id = ? AND visitor_id = ? AND session_id = ?')
           .get(affiliate.id, data.visitor_id, data.session_id);
         if (!alreadyTracked) {
-          db.prepare(
+          await db.prepare(
             `INSERT INTO affiliate_visits (affiliate_id, site_id, visitor_id, session_id, landing_page)
              VALUES (?, ?, ?, ?, ?)`
           ).run(affiliate.id, data.site_id, data.visitor_id, data.session_id, data.pathname);
@@ -132,7 +131,7 @@ export default function handler(req, res) {
         // invalid URL
       }
 
-      db.prepare(
+      await db.prepare(
         `INSERT INTO page_views (site_id, session_id, visitor_id, pathname, hostname, querystring, referrer)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).run(
@@ -146,14 +145,14 @@ export default function handler(req, res) {
       );
 
       const today = new Date().toISOString().slice(0, 10);
-      db.prepare(
+      await db.prepare(
         `INSERT INTO daily_stats (site_id, date, page_views, sessions, visitors)
          VALUES (?, ?, 1, 0, 0)
          ON CONFLICT(site_id, date) DO UPDATE SET page_views = page_views + 1`
       ).run(data.site_id, today);
 
       if (!existingSession) {
-        const visitorToday = db
+        const visitorToday = await db
           .prepare(
             `SELECT 1 FROM sessions
              WHERE site_id = ? AND visitor_id = ? AND date(started_at) = ? AND id != ?
@@ -161,7 +160,7 @@ export default function handler(req, res) {
           )
           .get(data.site_id, data.visitor_id, today, data.session_id);
 
-        db.prepare(
+        await db.prepare(
           `UPDATE daily_stats SET
             sessions = sessions + 1,
             visitors = visitors + CASE WHEN ? THEN 0 ELSE 1 END

@@ -3,7 +3,7 @@ import { getBackupConfig, saveBackupConfig, deleteBackupConfig, testConnection }
 
 export default withAuth(async function handler(req, res) {
   if (req.method === 'GET') {
-    const config = getBackupConfig();
+    const config = await getBackupConfig();
     // Mask sensitive keys
     if (config.access_key_id) {
       config.access_key_id = config.access_key_id.slice(0, 4) + '****';
@@ -25,7 +25,7 @@ export default withAuth(async function handler(req, res) {
 
   if (req.method === 'PUT') {
     // Test connection
-    const config = getBackupConfig();
+    const config = await getBackupConfig();
     // Allow overriding with body values for testing before saving
     const testConfig = {
       endpoint: req.body.endpoint || config.endpoint,

@@ -2,17 +2,17 @@ import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 import { parseDateRange, verifySiteOwnership } from '@/lib/analytics';
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { siteId, affiliateId } = req.query;
-  const site = verifySiteOwnership(siteId, req.user.userId);
+  const site = await verifySiteOwnership(siteId, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const db = getDb();
-  const affiliate = db
+  const db = await getDb();
+  const affiliate = await db
     .prepare('SELECT * FROM affiliates WHERE id = ? AND site_id = ?')
     .get(affiliateId, siteId);
   if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
@@ -21,7 +21,7 @@ export default withAuth(function handler(req, res) {
   const dateEnd = range.to + ' 23:59:59';
 
   // Stats
-  const stats = db
+  const stats = await db
     .prepare(
       `SELECT
         COUNT(*) as visits,
@@ -31,7 +31,7 @@ export default withAuth(function handler(req, res) {
     )
     .get(affiliateId, range.from, dateEnd);
 
-  const convStats = db
+  const convStats = await db
     .prepare(
       `SELECT
         COUNT(*) as conversions,
@@ -43,7 +43,7 @@ export default withAuth(function handler(req, res) {
     .get(affiliateId, range.from, dateEnd);
 
   // Time series
-  const visitTimeSeries = db
+  const visitTimeSeries = await db
     .prepare(
       `SELECT date(landed_at) as date,
         COUNT(*) as visits,
@@ -54,7 +54,7 @@ export default withAuth(function handler(req, res) {
     )
     .all(affiliateId, range.from, dateEnd);
 
-  const convTimeSeries = db
+  const convTimeSeries = await db
     .prepare(
       `SELECT date(created_at) as date,
         COUNT(*) as conversions,
@@ -67,7 +67,7 @@ export default withAuth(function handler(req, res) {
     .all(affiliateId, range.from, dateEnd);
 
   // Top landing pages
-  const landingPages = db
+  const landingPages = await db
     .prepare(
       `SELECT landing_page as name, COUNT(*) as count
        FROM affiliate_visits
@@ -78,7 +78,7 @@ export default withAuth(function handler(req, res) {
     .all(affiliateId, range.from, dateEnd);
 
   // Recent conversions
-  const conversions = db
+  const conversions = await db
     .prepare(
       `SELECT c.*, a.name as affiliate_name
        FROM conversions c

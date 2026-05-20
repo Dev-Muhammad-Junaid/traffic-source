@@ -17,7 +17,7 @@ export default function Home() {
     fetch('/api/auth/status')
       .then((res) => res.json())
       .then((data) => {
-        router.replace(data.hasUsers ? '/login' : '/register');
+        router.replace(data.registrationOpen && !data.hasUsers ? '/register' : '/login');
       })
       .catch(() => {
         router.replace('/login');

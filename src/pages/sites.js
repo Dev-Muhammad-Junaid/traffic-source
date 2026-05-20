@@ -47,8 +47,14 @@ export default function Sites() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, domain }),
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch {
+                throw new Error(text.startsWith('Internal') ? 'Server error — try again in a moment' : text.slice(0, 120));
+            }
+            if (!res.ok) throw new Error(data.error || 'Request failed');
             setShowModal(false);
             setName('');
             setDomain('');

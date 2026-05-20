@@ -1,0 +1,48 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "traffic-source",
+	"compatibility_date": "2026-05-20",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"vars": {
+		"DATABASE_DRIVER": "d1",
+		"NEXT_PUBLIC_APP_URL": "https://analytics.example.com",
+		"ALLOW_REGISTRATION": "true"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "traffic-source-db",
+			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			"migrations_dir": "d1/migrations"
+		}
+	],
+	"routes": [
+		{
+			"pattern": "analytics.example.com",
+			"custom_domain": true
+		}
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "traffic-source"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			"bucket_name": "traffic-source-opennext-cache"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	}
+}

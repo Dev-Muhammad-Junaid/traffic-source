@@ -14,14 +14,16 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/status')
       .then((res) => res.json())
       .then((data) => {
-        if (data.hasUsers) {
+        if (!data.registrationOpen) {
           router.replace('/login');
         } else {
+          setRegistrationOpen(!!data.allowRegistration);
           setChecking(false);
         }
       })
@@ -75,7 +77,9 @@ export default function Register() {
             </svg>
           </div>
           <h1>Traffic Source</h1>
-          <p className="auth-subtitle">Create your admin account</p>
+          <p className="auth-subtitle">
+            {registrationOpen ? 'Create your account' : 'Create your admin account'}
+          </p>
           <form onSubmit={handleSubmit}>
             {error && <div className="auth-error">{error}</div>}
             <div className="form-group">
@@ -125,6 +129,9 @@ export default function Register() {
               {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
+          <p className="auth-footer" style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+            Already have an account? <Link href="/login">Sign in</Link>
+          </p>
         </div>
       </div>
     </>

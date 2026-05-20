@@ -23,24 +23,28 @@ function daysAgo(n) {
  * otherwise fetches just yesterday's data (incremental).
  */
 export async function syncSite(siteId, { backfill = false } = {}) {
-  const db = getDb();
-  const link = getSiteLink(siteId);
+  const db = await getDb();
+  const link = await getSiteLink(siteId);
   if (!link) return { skipped: true };
 
-  const site = db.prepare('SELECT user_id FROM sites WHERE id = ?').get(siteId);
+  const site = await db.prepare('SELECT user_id FROM sites WHERE id = ?').get(siteId);
   if (!site) return { skipped: true };
 
-  const userConn = getUserConnection(site.user_id);
+  const userConn = await getUserConnection(site.user_id);
   if (!userConn) {
-    db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run('User Google account not connected', siteId);
+    await db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run('User Google account not connected', siteId);
     return { error: 'no user connection' };
   }
+
+  await db
+    .prepare("UPDATE gsc_site_links SET status='syncing', last_error=NULL WHERE site_id=?")
+    .run(siteId);
 
   let accessToken;
   try {
     accessToken = await refreshAccessToken(getDecryptedRefreshToken(userConn));
   } catch (err) {
-    db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run(err.message, siteId);
+    await db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run(err.message, siteId);
     return { error: err.message };
   }
 
@@ -58,7 +62,7 @@ export async function syncSite(siteId, { backfill = false } = {}) {
       querySearchAnalytics({ accessToken, property: link.gsc_property, startDate, endDate, dimensions: ['date', 'device'], rowLimit: 5000 }),
     ]);
   } catch (err) {
-    db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run(err.message, siteId);
+    await db.prepare("UPDATE gsc_site_links SET status='error', last_error=? WHERE site_id=?").run(err.message, siteId);
     return { error: err.message };
   }
 
@@ -93,55 +97,52 @@ export async function syncSite(siteId, { backfill = false } = {}) {
       clicks = excluded.clicks, impressions = excluded.impressions, ctr = excluded.ctr, position = excluded.position
   `);
 
-  const tx = db.transaction(() => {
+  await db.transaction(async () => {
     for (const r of queryRows) {
       const [date, query] = r.keys || [];
       if (!date || !query) continue;
-      upsertQuery.run(siteId, date, query, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
+      await upsertQuery.run(siteId, date, query, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
     }
     for (const r of pageRows) {
       const [date, page] = r.keys || [];
       if (!date || !page) continue;
-      upsertPage.run(siteId, date, page, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
+      await upsertPage.run(siteId, date, page, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
     }
     for (const r of totalRows) {
       const [date] = r.keys || [];
       if (!date) continue;
-      upsertTotal.run(siteId, date, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
+      await upsertTotal.run(siteId, date, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
     }
     for (const r of countryRows) {
       const [date, country] = r.keys || [];
       if (!date || !country) continue;
-      upsertCountry.run(siteId, date, country, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
+      await upsertCountry.run(siteId, date, country, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
     }
     for (const r of deviceRows) {
       const [date, device] = r.keys || [];
       if (!date || !device) continue;
-      upsertDevice.run(siteId, date, device, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
+      await upsertDevice.run(siteId, date, device, r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0);
     }
   });
-  tx();
 
-  // 90-day prune
-  db.prepare("DELETE FROM gsc_daily WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
-  db.prepare("DELETE FROM gsc_daily_pages WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
-  db.prepare("DELETE FROM gsc_daily_totals WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
-  db.prepare("DELETE FROM gsc_daily_countries WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
-  db.prepare("DELETE FROM gsc_daily_devices WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
+  await db.prepare("DELETE FROM gsc_daily WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
+  await db.prepare("DELETE FROM gsc_daily_pages WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
+  await db.prepare("DELETE FROM gsc_daily_totals WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
+  await db.prepare("DELETE FROM gsc_daily_countries WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
+  await db.prepare("DELETE FROM gsc_daily_devices WHERE site_id = ? AND date < date('now','-90 days')").run(siteId);
 
-  // Recompute trends
-  computeTrends(siteId);
+  await computeTrends(siteId);
 
-  db.prepare("UPDATE gsc_site_links SET status='active', last_sync_at=datetime('now'), last_error=NULL WHERE site_id=?").run(siteId);
+  await db.prepare("UPDATE gsc_site_links SET status='active', last_sync_at=datetime('now'), last_error=NULL WHERE site_id=?").run(siteId);
 
   return { queries: queryRows.length, pages: pageRows.length, days: totalRows.length };
 }
 
-export function computeTrends(siteId) {
-  const db = getDb();
+export async function computeTrends(siteId) {
+  const db = await getDb();
   // current 28d window: dates >= today-30 and <= today-2
   // previous 28d window: dates >= today-58 and <= today-30
-  const aggregate = db.prepare(`
+  const aggregate = await db.prepare(`
     SELECT query,
       SUM(CASE WHEN date >= date('now','-30 days') THEN clicks ELSE 0 END) AS clicks_28d,
       SUM(CASE WHEN date < date('now','-30 days') AND date >= date('now','-58 days') THEN clicks ELSE 0 END) AS clicks_prev_28d,
@@ -154,7 +155,7 @@ export function computeTrends(siteId) {
     GROUP BY query
   `).all(siteId);
 
-  db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(siteId);
+  await db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(siteId);
 
   const insert = db.prepare(`
     INSERT INTO gsc_trends (site_id, query, clicks_28d, clicks_prev_28d, delta_clicks,
@@ -162,8 +163,8 @@ export function computeTrends(siteId) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `);
 
-  const tx = db.transaction((rows) => {
-    for (const r of rows) {
+  await db.transaction(async () => {
+    for (const r of aggregate) {
       const clicks28 = r.clicks_28d || 0;
       const clicksPrev = r.clicks_prev_28d || 0;
       const imps28 = r.imps_28d || 0;
@@ -182,16 +183,15 @@ export function computeTrends(siteId) {
       else if (deltaClicks < 0 || deltaPosition < -0.5) status = 'declining';
       else status = 'stable';
 
-      insert.run(siteId, r.query, clicks28, clicksPrev, deltaClicks, imps28, impsPrev, pos28, posPrev, deltaPosition, ctr, status);
+      await insert.run(siteId, r.query, clicks28, clicksPrev, deltaClicks, imps28, impsPrev, pos28, posPrev, deltaPosition, ctr, status);
     }
   });
-  tx(aggregate);
 }
 
 export async function syncAllConnections() {
-  if (!isGscConfigured()) return { skipped: 'not configured' };
-  const db = getDb();
-  const conns = db.prepare("SELECT site_id, last_sync_at FROM gsc_site_links").all();
+  if (!(await isGscConfigured())) return { skipped: 'not configured' };
+  const db = await getDb();
+  const conns = await db.prepare("SELECT site_id, last_sync_at FROM gsc_site_links").all();
   const results = [];
   for (const c of conns) {
     // Only sync if last_sync_at is null or older than 12 hours

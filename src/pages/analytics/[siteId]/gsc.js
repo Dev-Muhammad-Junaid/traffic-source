@@ -22,6 +22,7 @@ export default function GscPage() {
   const [propSiteDomain, setPropSiteDomain] = useState('');
   const [selectedProp, setSelectedProp] = useState('');
   const [linking, setLinking] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [pageError, setPageError] = useState('');
 
   const load = useCallback(async () => {
@@ -33,6 +34,13 @@ export default function GscPage() {
   }, [siteId, period]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Poll while initial backfill is running
+  useEffect(() => {
+    if (!data?.linked || data?.link?.lastSyncAt) return;
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, [data?.linked, data?.link?.lastSyncAt, load]);
 
   useEffect(() => {
     if (data?.googleConnected && !data?.linked && !properties) {
@@ -59,14 +67,27 @@ export default function GscPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ property: selectedProp }),
     });
+    const d = await r.json().catch(() => ({}));
     setLinking(false);
-    if (r.ok) { setProperties(null); load(); }
+    if (r.ok) {
+      setProperties(null);
+      load();
+    } else {
+      alert(d.error || 'Failed to link property');
+    }
   };
 
   const unlink = async () => {
     if (!confirm('Unlink this site from Search Console? All synced keyword data will be deleted.')) return;
     await fetch(`/api/sites/${siteId}/gsc/disconnect`, { method: 'POST' });
     setProperties(null);
+    load();
+  };
+
+  const triggerSync = async () => {
+    setSyncing(true);
+    await fetch(`/api/sites/${siteId}/gsc/sync`, { method: 'POST' });
+    setSyncing(false);
     load();
   };
 
@@ -99,7 +120,9 @@ export default function GscPage() {
           />
         )}
 
-        {data.googleConnected && data.linked && <Dashboard data={data} onUnlink={unlink} />}
+        {data.googleConnected && data.linked && (
+          <Dashboard data={data} onUnlink={unlink} onSync={triggerSync} syncing={syncing} />
+        )}
       </DashboardLayout>
     </>
   );
@@ -156,7 +179,7 @@ function PropertyPicker({ properties, selectedProp, setSelectedProp, onLink, lin
 // Dashboard
 // ─────────────────────────────────────────────────────────────────
 
-function Dashboard({ data, onUnlink }) {
+function Dashboard({ data, onUnlink, onSync, syncing }) {
   const t = data.totals || {};
   const clicks = t.clicks || 0;
   const clicksPrev = t.clicks_prev || 0;
@@ -184,8 +207,15 @@ function Dashboard({ data, onUnlink }) {
       )}
 
       {!data.link.lastSyncAt && (
-        <div className="panel" style={{ padding: 16, marginBottom: 16, fontSize: 13 }}>
-          Initial backfill is running in the background. Refresh in a moment to see your data.
+        <div className="panel" style={{ padding: 16, marginBottom: 16, fontSize: 13, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span>
+            {data.link.status === 'syncing'
+              ? 'Initial backfill is running… this page will refresh automatically.'
+              : 'Initial backfill has not completed yet.'}
+          </span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onSync} disabled={syncing}>
+            {syncing ? 'Starting…' : 'Run sync now'}
+          </button>
         </div>
       )}
 

@@ -5,7 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function Settings() {
   const { user } = useAuth();
-  const [tab, setTab] = useState('profile');
+  const [tab, setTab] = useState(() => {
+    if (typeof window === 'undefined') return 'profile';
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return t === 'integrations' || t === 'backups' ? t : 'profile';
+  });
   const [name, setName] = useState(user?.name || '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -193,12 +197,12 @@ function GscIntegration() {
       body: JSON.stringify({ clientId, clientSecret }),
     });
     setSaving(false);
+    const d = await r.json().catch(() => ({}));
     if (r.ok) {
-      setMsg('Credentials saved. Now click "Connect Google Search Console" in Step 3 below.');
+      setMsg(d.message || 'Credentials saved. Now click "Connect Google Search Console" in Step 3 below.');
       setClientId(''); setClientSecret('');
-      load();
+      await load();
     } else {
-      const d = await r.json().catch(() => ({}));
       setErr(d.error || 'Failed to save');
     }
   };

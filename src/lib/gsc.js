@@ -7,9 +7,9 @@ const SCOPES = 'https://www.googleapis.com/auth/webmasters.readonly https://www.
 
 // ───── settings (client id/secret stored encrypted in app_settings) ─────
 
-export function getGscCredentials() {
-  const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM app_settings WHERE key IN ('gsc_client_id','gsc_client_secret')").all();
+export async function getGscCredentials() {
+  const db = await getDb();
+  const rows = await db.prepare("SELECT key, value FROM app_settings WHERE key IN ('gsc_client_id','gsc_client_secret')").all();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   return {
     clientId: decrypt(map.gsc_client_id),
@@ -17,23 +17,23 @@ export function getGscCredentials() {
   };
 }
 
-export function saveGscCredentials({ clientId, clientSecret }) {
-  const db = getDb();
+export async function saveGscCredentials({ clientId, clientSecret }) {
+  const db = await getDb();
   const up = db.prepare(`
     INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
   `);
-  up.run('gsc_client_id', encrypt(clientId));
-  up.run('gsc_client_secret', encrypt(clientSecret));
+  await up.run('gsc_client_id', encrypt(clientId));
+  await up.run('gsc_client_secret', encrypt(clientSecret));
 }
 
-export function clearGscCredentials() {
-  const db = getDb();
-  db.prepare("DELETE FROM app_settings WHERE key IN ('gsc_client_id','gsc_client_secret')").run();
+export async function clearGscCredentials() {
+  const db = await getDb();
+  await db.prepare("DELETE FROM app_settings WHERE key IN ('gsc_client_id','gsc_client_secret')").run();
 }
 
-export function isGscConfigured() {
-  const { clientId, clientSecret } = getGscCredentials();
+export async function isGscConfigured() {
+  const { clientId, clientSecret } = await getGscCredentials();
   return !!(clientId && clientSecret);
 }
 
@@ -61,7 +61,7 @@ export function buildAuthUrl({ clientId, redirectUri, state }) {
 }
 
 export async function exchangeCodeForTokens({ code, redirectUri }) {
-  const { clientId, clientSecret } = getGscCredentials();
+  const { clientId, clientSecret } = await getGscCredentials();
   if (!clientId || !clientSecret) throw new Error('GSC not configured');
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -79,7 +79,7 @@ export async function exchangeCodeForTokens({ code, redirectUri }) {
 }
 
 export async function refreshAccessToken(refreshToken) {
-  const { clientId, clientSecret } = getGscCredentials();
+  const { clientId, clientSecret } = await getGscCredentials();
   if (!clientId || !clientSecret) throw new Error('GSC not configured');
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -132,14 +132,14 @@ export async function querySearchAnalytics({ accessToken, property, startDate, e
 
 // ───── user-level Google connection ─────
 
-export function getUserConnection(userId) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM gsc_connections WHERE user_id = ?').get(userId);
+export async function getUserConnection(userId) {
+  const db = await getDb();
+  return await db.prepare('SELECT * FROM gsc_connections WHERE user_id = ?').get(userId);
 }
 
-export function saveUserConnection({ userId, refreshToken, googleEmail }) {
-  const db = getDb();
-  db.prepare(`
+export async function saveUserConnection({ userId, refreshToken, googleEmail }) {
+  const db = await getDb();
+  await db.prepare(`
     INSERT INTO gsc_connections (user_id, refresh_token, google_email, connected_at)
     VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
@@ -150,19 +150,19 @@ export function saveUserConnection({ userId, refreshToken, googleEmail }) {
   `).run(userId, encrypt(refreshToken), googleEmail);
 }
 
-export function deleteUserConnection(userId) {
-  const db = getDb();
-  // Cascade: unlink all of user's sites and wipe their GSC data
-  const siteIds = db.prepare('SELECT id FROM sites WHERE user_id = ?').all(userId).map((r) => r.id);
-  const tx = db.transaction(() => {
+
+export async function deleteUserConnection(userId) {
+  const db = await getDb();
+  const siteRows = await db.prepare('SELECT id FROM sites WHERE user_id = ?').all(userId);
+  const siteIds = siteRows.map((r) => r.id);
+  await db.transaction(async () => {
     for (const sid of siteIds) {
-      db.prepare('DELETE FROM gsc_site_links WHERE site_id = ?').run(sid);
-      db.prepare('DELETE FROM gsc_daily WHERE site_id = ?').run(sid);
-      db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(sid);
+      await db.prepare('DELETE FROM gsc_site_links WHERE site_id = ?').run(sid);
+      await db.prepare('DELETE FROM gsc_daily WHERE site_id = ?').run(sid);
+      await db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(sid);
     }
-    db.prepare('DELETE FROM gsc_connections WHERE user_id = ?').run(userId);
+    await db.prepare('DELETE FROM gsc_connections WHERE user_id = ?').run(userId);
   });
-  tx();
 }
 
 export function getDecryptedRefreshToken(conn) {
@@ -171,23 +171,24 @@ export function getDecryptedRefreshToken(conn) {
 
 // ───── per-site property link ─────
 
-export function getSiteLink(siteId) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM gsc_site_links WHERE site_id = ?').get(siteId);
+export async function getSiteLink(siteId) {
+  const db = await getDb();
+  return await db.prepare('SELECT * FROM gsc_site_links WHERE site_id = ?').get(siteId);
 }
 
-export function linkSiteProperty(siteId, property) {
-  const db = getDb();
-  db.prepare(`
+export async function linkSiteProperty(siteId, property) {
+  const db = await getDb();
+  await db.prepare(`
     INSERT INTO gsc_site_links (site_id, gsc_property, status, linked_at)
     VALUES (?, ?, 'active', datetime('now'))
     ON CONFLICT(site_id) DO UPDATE SET gsc_property = excluded.gsc_property, status = 'active', last_error = NULL
   `).run(siteId, property);
 }
 
-export function unlinkSite(siteId) {
-  const db = getDb();
-  db.prepare('DELETE FROM gsc_site_links WHERE site_id = ?').run(siteId);
-  db.prepare('DELETE FROM gsc_daily WHERE site_id = ?').run(siteId);
-  db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(siteId);
+
+export async function unlinkSite(siteId) {
+  const db = await getDb();
+  await db.prepare('DELETE FROM gsc_site_links WHERE site_id = ?').run(siteId);
+  await db.prepare('DELETE FROM gsc_daily WHERE site_id = ?').run(siteId);
+  await db.prepare('DELETE FROM gsc_trends WHERE site_id = ?').run(siteId);
 }

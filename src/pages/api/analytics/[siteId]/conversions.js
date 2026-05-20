@@ -2,16 +2,16 @@ import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 import { parseDateRange, verifySiteOwnership } from '@/lib/analytics';
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { siteId, search, page = '1', limit = '25' } = req.query;
-  const site = verifySiteOwnership(siteId, req.user.userId);
+  const site = await verifySiteOwnership(siteId, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const db = getDb();
+  const db = await getDb();
   const range = parseDateRange(req.query);
   const dateEnd = range.to + ' 23:59:59';
   const pageNum = Math.max(1, parseInt(page));
@@ -35,7 +35,7 @@ export default withAuth(function handler(req, res) {
   }
 
   // Total count for pagination
-  const totalRow = db
+  const totalRow = await db
     .prepare(
       `SELECT COUNT(*) as total
        FROM conversions c
@@ -46,7 +46,7 @@ export default withAuth(function handler(req, res) {
     .get(...baseParams, ...searchParams);
 
   // Main query: conversions joined with session data
-  const conversions = db
+  const conversions = await db
     .prepare(
       `SELECT
         c.id,
@@ -81,13 +81,13 @@ export default withAuth(function handler(req, res) {
     .all(...baseParams, ...searchParams, pageSize, offset);
 
   // Prepare statements for enrichment
-  const firstSessionStmt = db.prepare(
+  const firstSessionStmt = await db.prepare(
     `SELECT started_at FROM sessions
      WHERE site_id = ? AND visitor_id = ?
      ORDER BY started_at ASC LIMIT 1`
   );
 
-  const pageJourneyStmt = db.prepare(
+  const pageJourneyStmt = await db.prepare(
     `SELECT pathname, timestamp FROM page_views
      WHERE site_id = ? AND visitor_id = ?
      ORDER BY timestamp ASC
@@ -95,41 +95,40 @@ export default withAuth(function handler(req, res) {
   );
 
   // Fallback: find session data by visitor_id when session_id JOIN returned nulls
-  const visitorSessionStmt = db.prepare(
+  const visitorSessionStmt = await db.prepare(
     `SELECT country, city, browser, os, device_type, entry_page, exit_page, page_count, duration
      FROM sessions
      WHERE site_id = ? AND visitor_id = ?
      ORDER BY started_at DESC LIMIT 1`
   );
 
-  // Enrich each conversion with time-to-complete and page journey
-  const enriched = conversions.map((conv) => {
+  const enriched = [];
+  for (const conv of conversions) {
+    let row = { ...conv };
     let timeToComplete = null;
     let journey = [];
 
-    // If LEFT JOIN returned no session data, try finding by visitor_id
-    if (!conv.country && !conv.browser && conv.visitor_id) {
-      const fallbackSession = visitorSessionStmt.get(siteId, conv.visitor_id);
+    if (!row.country && !row.browser && row.visitor_id) {
+      const fallbackSession = await visitorSessionStmt.get(siteId, row.visitor_id);
       if (fallbackSession) {
-        conv = { ...conv, ...fallbackSession, session_duration: fallbackSession.duration };
+        row = { ...row, ...fallbackSession, session_duration: fallbackSession.duration };
       }
     }
 
-    if (conv.visitor_id) {
-      const firstSession = firstSessionStmt.get(siteId, conv.visitor_id);
+    if (row.visitor_id) {
+      const firstSession = await firstSessionStmt.get(siteId, row.visitor_id);
       if (firstSession) {
         timeToComplete = Math.round(
-          (new Date(conv.created_at).getTime() -
+          (new Date(row.created_at).getTime() -
             new Date(firstSession.started_at).getTime()) /
             1000
         );
       }
-
-      journey = pageJourneyStmt.all(siteId, conv.visitor_id);
+      journey = await pageJourneyStmt.all(siteId, row.visitor_id);
     }
 
-    return { ...conv, timeToComplete, journey };
-  });
+    enriched.push({ ...row, timeToComplete, journey });
+  }
 
   res.status(200).json({
     site: { id: site.id, name: site.name, domain: site.domain },

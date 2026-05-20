@@ -1,23 +1,30 @@
 import { withAuth } from '@/lib/withAuth';
 import { getDb } from '@/lib/db';
 import { getSiteLink, getUserConnection } from '@/lib/gsc';
+import { syncSite } from '@/lib/gsc-sync';
+import { scheduleBackgroundTask } from '@/lib/background-task';
 import { alpha3ToAlpha2 } from '@/lib/iso-countries';
 
 const PERIOD_DAYS = { '24h': 1, '7d': 7, '30d': 30, '90d': 90, '12m': 90 };
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   const { id, period = '30d' } = req.query;
   const days = PERIOD_DAYS[period] || 30;
 
-  const db = getDb();
-  const site = db.prepare('SELECT id, name, domain FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
+  const db = await getDb();
+  const site = await db.prepare('SELECT id, name, domain FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const userConn = getUserConnection(req.user.userId);
-  const link = getSiteLink(id);
+  const userConn = await getUserConnection(req.user.userId);
+  const link = await getSiteLink(id);
 
   if (!userConn) return res.status(200).json({ site, googleConnected: false, linked: false });
   if (!link) return res.status(200).json({ site, googleConnected: true, googleEmail: userConn.google_email, linked: false });
+
+  // On Workers, backfill must run via waitUntil/cron — kick off if never synced.
+  if (!link.last_sync_at && link.status !== 'syncing') {
+    scheduleBackgroundTask(() => syncSite(Number(id), { backfill: true }));
+  }
 
   // GSC has 2-3d lag — anchor end at today-1 (exclusive), so data through today-2 is included.
   // Current window: dates >= today-(days+1) and < today-1   → covers `days` full days ending at today-2
@@ -28,7 +35,7 @@ export default withAuth(function handler(req, res) {
   const prevEnd = `date('now','-${days + 1} days')`;
 
   // ── Totals: current + previous, weighted CTR/position (from gsc_daily_totals — most accurate) ──
-  const totalsRow = db.prepare(`
+  const totalsRow = (await db.prepare(`
     SELECT
       SUM(CASE WHEN date >= ${curStart} AND date < ${curEnd} THEN clicks ELSE 0 END) AS clicks,
       SUM(CASE WHEN date >= ${prevStart} AND date < ${prevEnd} THEN clicks ELSE 0 END) AS clicks_prev,
@@ -39,7 +46,7 @@ export default withAuth(function handler(req, res) {
       SUM(CASE WHEN date >= ${prevStart} AND date < ${prevEnd} THEN position * impressions ELSE 0 END) AS pos_num_prev,
       SUM(CASE WHEN date >= ${prevStart} AND date < ${prevEnd} THEN impressions ELSE 0 END) AS pos_den_prev
     FROM gsc_daily_totals WHERE site_id = ?
-  `).get(id) || {};
+  `).get(id)) || {};
 
   const totals = {
     clicks: totalsRow.clicks || 0,
@@ -53,7 +60,7 @@ export default withAuth(function handler(req, res) {
   };
 
   // ── Time series for the current window (from totals — accurate, includes anonymized) ──
-  const timeSeries = db.prepare(`
+  const timeSeries = await db.prepare(`
     SELECT date, clicks, impressions
     FROM gsc_daily_totals
     WHERE site_id = ? AND date >= ${curStart} AND date < ${curEnd}
@@ -61,7 +68,7 @@ export default withAuth(function handler(req, res) {
   `).all(id);
 
   // ── Top pages (current period) — from page-only fetch, includes impression-only pages ──
-  const topPages = db.prepare(`
+  const topPages = await db.prepare(`
     SELECT page,
       SUM(clicks) AS clicks,
       SUM(impressions) AS impressions,
@@ -74,7 +81,7 @@ export default withAuth(function handler(req, res) {
     LIMIT 100
   `).all(id);
 
-  const topCountriesRaw = db.prepare(`
+  const topCountriesRaw = await db.prepare(`
     SELECT country,
       SUM(clicks) AS clicks,
       SUM(impressions) AS impressions,
@@ -92,7 +99,7 @@ export default withAuth(function handler(req, res) {
     country_code: alpha3ToAlpha2(c.country) || null,
   }));
 
-  const devices = db.prepare(`
+  const devices = await db.prepare(`
     SELECT device,
       SUM(clicks) AS clicks,
       SUM(impressions) AS impressions,
@@ -105,7 +112,7 @@ export default withAuth(function handler(req, res) {
   `).all(id);
 
   // ── Per-query aggregation, current + previous, used for top + insights ──
-  const queryRows = db.prepare(`
+  const queryRows = await db.prepare(`
     SELECT query,
       SUM(CASE WHEN date >= ${curStart} AND date < ${curEnd} THEN clicks ELSE 0 END) AS clicks,
       SUM(CASE WHEN date >= ${prevStart} AND date < ${prevEnd} THEN clicks ELSE 0 END) AS clicks_prev,

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Login() {
   const { login } = useAuth();
@@ -8,6 +9,14 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [canRegister, setCanRegister] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/status')
+      .then((res) => res.json())
+      .then((data) => setCanRegister(!!data.allowRegistration))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,6 +75,11 @@ export default function Login() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+          {canRegister && (
+            <p className="auth-footer" style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+              No account? <Link href="/register">Create one</Link>
+            </p>
+          )}
         </div>
       </div>
     </>

@@ -4,11 +4,11 @@ import { getUserConnection, getDecryptedRefreshToken, refreshAccessToken, listGs
 
 export default withAuth(async function handler(req, res) {
   const { id } = req.query;
-  const db = getDb();
-  const site = db.prepare('SELECT id, domain FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
+  const db = await getDb();
+  const site = await db.prepare('SELECT id, domain FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const conn = getUserConnection(req.user.userId);
+  const conn = await getUserConnection(req.user.userId);
   if (!conn) return res.status(400).json({ error: 'Google account not connected. Connect it in Settings → Integrations.' });
 
   try {

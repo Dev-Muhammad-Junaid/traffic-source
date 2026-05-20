@@ -13,12 +13,12 @@ export default withAuth(async function handler(req, res) {
   if (!query) return res.status(400).json({ error: 'query required' });
   const days = PERIOD_DAYS[period] || 30;
 
-  const db = getDb();
-  const site = db.prepare('SELECT id FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
+  const db = await getDb();
+  const site = await db.prepare('SELECT id FROM sites WHERE id = ? AND user_id = ?').get(id, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const link = getSiteLink(id);
-  const conn = getUserConnection(req.user.userId);
+  const link = await getSiteLink(id);
+  const conn = await getUserConnection(req.user.userId);
   if (!link || !conn) return res.status(400).json({ error: 'Not connected' });
 
   let accessToken;

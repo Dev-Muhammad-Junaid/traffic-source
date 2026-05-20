@@ -64,16 +64,17 @@ function hasSessionFilters(query) {
     query.exit_page || query.browser || query.os || query.device;
 }
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
+  try {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { siteId } = req.query;
-  const site = verifySiteOwnership(siteId, req.user.userId);
+  const site = await verifySiteOwnership(siteId, req.user.userId);
   if (!site) return res.status(404).json({ error: 'Site not found' });
 
-  const db = getDb();
+  const db = await getDb();
   const range = parseDateRange(req.query);
   const dateEnd = range.to + ' 23:59:59';
 
@@ -108,7 +109,7 @@ export default withAuth(function handler(req, res) {
     const pvFilterClause = usePageFilter ? ` AND pv.pathname = ?` : '';
     const pvParams = usePageFilter ? [req.query.page] : [];
 
-    current = db
+    current = await db
       .prepare(
         `SELECT
           COUNT(DISTINCT s.visitor_id) as total_visitors,
@@ -122,7 +123,7 @@ export default withAuth(function handler(req, res) {
       )
       .get(siteId, range.from, dateEnd, ...sfAliased.params, ...pvParams);
 
-    previous = db
+    previous = await db
       .prepare(
         `SELECT
           COUNT(DISTINCT s.visitor_id) as total_visitors,
@@ -136,7 +137,7 @@ export default withAuth(function handler(req, res) {
       )
       .get(siteId, prevRange.from, prevRange.to + ' 23:59:59', ...sfAliased.params, ...pvParams);
   } else {
-    current = db
+    current = await db
       .prepare(
         `SELECT
           COALESCE(SUM(visitors), 0) as total_visitors,
@@ -149,7 +150,7 @@ export default withAuth(function handler(req, res) {
       )
       .get(siteId, range.from, range.to);
 
-    previous = db
+    previous = await db
       .prepare(
         `SELECT
           COALESCE(SUM(visitors), 0) as total_visitors,
@@ -182,7 +183,7 @@ export default withAuth(function handler(req, res) {
     const pvParams = usePageFilter ? [req.query.page] : [];
 
     if (req.query.period === '24h') {
-      timeSeries = db
+      timeSeries = await db
         .prepare(
           `SELECT strftime('%Y-%m-%d %H:00', s.started_at) as date,
                   COUNT(DISTINCT s.id) as sessions,
@@ -195,7 +196,7 @@ export default withAuth(function handler(req, res) {
         )
         .all(siteId, ...sfAliased.params, ...pvParams);
     } else {
-      timeSeries = db
+      timeSeries = await db
         .prepare(
           `SELECT date(s.started_at) as date,
                   COUNT(DISTINCT s.visitor_id) as visitors,
@@ -210,7 +211,7 @@ export default withAuth(function handler(req, res) {
     }
   } else {
     if (req.query.period === '24h') {
-      timeSeries = db
+      timeSeries = await db
         .prepare(
           `SELECT strftime('%Y-%m-%d %H:00', timestamp) as date,
                   COUNT(*) as page_views,
@@ -221,7 +222,7 @@ export default withAuth(function handler(req, res) {
         )
         .all(siteId);
     } else {
-      timeSeries = db
+      timeSeries = await db
         .prepare(
           `SELECT date, visitors, sessions, page_views
            FROM daily_stats
@@ -233,14 +234,14 @@ export default withAuth(function handler(req, res) {
   }
 
   // Helper: apply session filters to a sessions-based query
-  const sessQ = (baseWhere, baseParams, select, groupOrder) => {
-    return db
+  const sessQ = async (baseWhere, baseParams, select, groupOrder) => {
+    return await db
       .prepare(`${select} FROM sessions WHERE ${baseWhere}${sfWhere} ${groupOrder}`)
       .all(...baseParams, ...sf.params);
   };
 
   // --- Sources ---
-  const sources = sessQ(
+  const sources = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ?`,
     [siteId, range.from, dateEnd],
     `SELECT COALESCE(utm_source, referrer_domain, 'Direct') as name,
@@ -254,7 +255,7 @@ export default withAuth(function handler(req, res) {
   let pages, entryPages, exitPages;
 
   if (useSessionFilters) {
-    pages = db
+    pages = await db
       .prepare(
         `SELECT pv.pathname as name, COUNT(*) as views,
           COUNT(DISTINCT pv.visitor_id) as visitors
@@ -265,7 +266,7 @@ export default withAuth(function handler(req, res) {
       )
       .all(siteId, range.from, dateEnd, ...sfAliased.params, ...pvf.params);
   } else {
-    pages = db
+    pages = await db
       .prepare(
         `SELECT pathname as name, COUNT(*) as views,
           COUNT(DISTINCT visitor_id) as visitors
@@ -276,7 +277,7 @@ export default withAuth(function handler(req, res) {
       .all(siteId, range.from, dateEnd, ...pvf.params);
   }
 
-  entryPages = sessQ(
+  entryPages = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ?`,
     [siteId, range.from, dateEnd],
     `SELECT entry_page as name, COUNT(*) as sessions,
@@ -284,7 +285,7 @@ export default withAuth(function handler(req, res) {
     `GROUP BY entry_page ORDER BY sessions DESC LIMIT 10`
   );
 
-  exitPages = sessQ(
+  exitPages = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ?`,
     [siteId, range.from, dateEnd],
     `SELECT exit_page as name, COUNT(*) as sessions`,
@@ -292,14 +293,14 @@ export default withAuth(function handler(req, res) {
   );
 
   // --- Geography ---
-  const countries = sessQ(
+  const countries = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND country IS NOT NULL AND country != ''`,
     [siteId, range.from, dateEnd],
     `SELECT country as name, COUNT(*) as count`,
     `GROUP BY country ORDER BY count DESC LIMIT 20`
   );
 
-  const cities = sessQ(
+  const cities = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND city IS NOT NULL AND city != ''`,
     [siteId, range.from, dateEnd],
     `SELECT city as name, COUNT(*) as count`,
@@ -307,21 +308,21 @@ export default withAuth(function handler(req, res) {
   );
 
   // --- Tech ---
-  const browsers = sessQ(
+  const browsers = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND browser IS NOT NULL AND browser != ''`,
     [siteId, range.from, dateEnd],
     `SELECT browser as name, COUNT(*) as count`,
     `GROUP BY browser ORDER BY count DESC LIMIT 10`
   );
 
-  const os = sessQ(
+  const os = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND os IS NOT NULL AND os != ''`,
     [siteId, range.from, dateEnd],
     `SELECT os as name, COUNT(*) as count`,
     `GROUP BY os ORDER BY count DESC LIMIT 10`
   );
 
-  const devices = sessQ(
+  const devices = await sessQ(
     `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND device_type IS NOT NULL AND device_type != ''`,
     [siteId, range.from, dateEnd],
     `SELECT device_type as name, COUNT(*) as count`,
@@ -332,7 +333,7 @@ export default withAuth(function handler(req, res) {
   let convTotals, convBySource, convTimeSeries;
 
   if (useSessionFilters) {
-    convTotals = db
+    convTotals = await db
       .prepare(
         `SELECT
           COUNT(*) as total_conversions,
@@ -345,7 +346,7 @@ export default withAuth(function handler(req, res) {
       )
       .get(siteId, range.from, dateEnd, ...sfAliased.params);
 
-    convBySource = db
+    convBySource = await db
       .prepare(
         `SELECT COALESCE(s.utm_source, s.referrer_domain, 'Direct') as name,
           COUNT(*) as conversions,
@@ -358,7 +359,7 @@ export default withAuth(function handler(req, res) {
       )
       .all(siteId, range.from, dateEnd, ...sfAliased.params);
 
-    convTimeSeries = db
+    convTimeSeries = await db
       .prepare(
         `SELECT date(c.created_at) as date,
           COUNT(*) as conversions,
@@ -371,7 +372,7 @@ export default withAuth(function handler(req, res) {
       )
       .all(siteId, range.from, dateEnd, ...sfAliased.params);
   } else {
-    convTotals = db
+    convTotals = await db
       .prepare(
         `SELECT
           COUNT(*) as total_conversions,
@@ -383,7 +384,7 @@ export default withAuth(function handler(req, res) {
       )
       .get(siteId, range.from, dateEnd);
 
-    convBySource = db
+    convBySource = await db
       .prepare(
         `SELECT COALESCE(utm_source, referrer_domain, 'Direct') as name,
           COUNT(*) as conversions,
@@ -395,7 +396,7 @@ export default withAuth(function handler(req, res) {
       )
       .all(siteId, range.from, dateEnd);
 
-    convTimeSeries = db
+    convTimeSeries = await db
       .prepare(
         `SELECT date(created_at) as date,
           COUNT(*) as conversions,
@@ -414,7 +415,7 @@ export default withAuth(function handler(req, res) {
       : 0;
 
   // --- Affiliates ---
-  const affiliateBreakdown = db
+  const affiliateBreakdown = await db
     .prepare(
       `SELECT a.name, a.slug,
         COALESCE(v.visits, 0) as visits,
@@ -483,4 +484,8 @@ export default withAuth(function handler(req, res) {
     },
     affiliates: affiliateBreakdown,
   });
+  } catch (err) {
+    console.error('Overview API error:', err);
+    return res.status(500).json({ error: 'Failed to load analytics' });
+  }
 });

@@ -1,15 +1,15 @@
 import { withAuth } from '@/lib/withAuth';
 import { getDb } from '@/lib/db';
 
-export default withAuth(function handler(req, res) {
+export default withAuth(async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { id } = req.query;
-  const db = getDb();
+  const db = await getDb();
 
-  const site = db
+  const site = await db
     .prepare('SELECT * FROM sites WHERE id = ? AND user_id = ?')
     .get(id, req.user.userId);
 

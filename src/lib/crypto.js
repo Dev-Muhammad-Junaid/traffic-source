@@ -2,19 +2,36 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
-const KEY_PATH = path.join(path.dirname(process.env.DATABASE_PATH || './data/analytics.db'), '.appkey');
+const KEY_PATH = path.join(
+  path.dirname(process.env.DATABASE_PATH || './data/analytics.db'),
+  '.appkey'
+);
 
 let cachedKey;
 
 function getKey() {
   if (cachedKey) return cachedKey;
+
+  const envKey = process.env.APP_ENCRYPTION_KEY?.trim();
+  if (envKey) {
+    cachedKey = Buffer.from(envKey, 'hex');
+    if (cachedKey.length !== 32) {
+      throw new Error('APP_ENCRYPTION_KEY must be 64 hex characters (32 bytes)');
+    }
+    return cachedKey;
+  }
+
   try {
     cachedKey = Buffer.from(fs.readFileSync(KEY_PATH, 'utf8').trim(), 'hex');
     if (cachedKey.length !== 32) throw new Error('bad key');
   } catch {
     cachedKey = crypto.randomBytes(32);
-    fs.mkdirSync(path.dirname(KEY_PATH), { recursive: true });
-    fs.writeFileSync(KEY_PATH, cachedKey.toString('hex'), { mode: 0o600 });
+    try {
+      fs.mkdirSync(path.dirname(KEY_PATH), { recursive: true });
+      fs.writeFileSync(KEY_PATH, cachedKey.toString('hex'), { mode: 0o600 });
+    } catch {
+      // Workers have no local filesystem — set APP_ENCRYPTION_KEY in production
+    }
   }
   return cachedKey;
 }

@@ -13,9 +13,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const db = getDb();
+    const db = await getDb();
 
-    const user = db
+    const user = await db
       .prepare('SELECT * FROM users WHERE email = ?')
       .get(email.toLowerCase());
 
