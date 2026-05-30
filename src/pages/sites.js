@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 import dynamic from 'next/dynamic';
 import CountryFlag from '@/components/ui/CountryFlag';
 import TechIcon from '@/components/ui/TechIcon';
@@ -13,8 +15,10 @@ import { getCountryName } from '@/lib/formatters';
 const VisitorMap = dynamic(() => import('@/components/ui/VisitorMap'), { ssr: false });
 
 export default function Sites() {
+    const { user, loading: authLoading, refreshUser } = useAuth();
     const [sites, setSites] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [name, setName] = useState('');
     const [domain, setDomain] = useState('');
@@ -23,20 +27,41 @@ export default function Sites() {
     const router = useRouter();
 
     const fetchSites = useCallback(async () => {
+        setLoadError('');
+        setLoading(true);
         try {
-            const res = await fetch('/api/sites');
-            if (res.ok) {
-                const data = await res.json();
-                setSites(data.sites);
+            const res = await fetch('/api/sites', { credentials: 'same-origin' });
+            if (res.status === 401) {
+                await refreshUser();
+                setLoadError('session');
+                setSites([]);
+                return;
             }
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setLoadError(data.error || 'Failed to load sites');
+                setSites([]);
+                return;
+            }
+            const data = await res.json();
+            setSites(data.sites || []);
+        } catch {
+            setLoadError('Could not load sites. Check your connection and try again.');
+            setSites([]);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [refreshUser]);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!user) {
+            setLoading(false);
+            setSites([]);
+            return;
+        }
         fetchSites();
-    }, [fetchSites]);
+    }, [authLoading, user, fetchSites]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -107,9 +132,28 @@ export default function Sites() {
                     </button>
                 </div>
 
-                {view === 'sites' && loading ? (
+                {view === 'sites' && (loading || authLoading) ? (
                     <div className="loading-inline">
                         <div className="loading-spinner" />
+                    </div>
+                ) : view === 'sites' && loadError ? (
+                    <div className="empty-state">
+                        <h3>{loadError === 'session' ? 'Session expired' : 'Could not load sites'}</h3>
+                        <p style={{ marginBottom: 16 }}>
+                            {loadError === 'session'
+                                ? 'Sign in again to see your sites.'
+                                : loadError}
+                        </p>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button type="button" className="btn btn-primary" onClick={() => fetchSites()}>
+                                Try again
+                            </button>
+                            {loadError === 'session' && (
+                                <Link href="/login" className="btn btn-secondary">
+                                    Sign in
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 ) : view === 'sites' && sites.length === 0 ? (
                     <div className="empty-state">
@@ -297,26 +341,46 @@ function getSiteColor(siteId) {
 }
 
 function OverviewDashboard({ onClose }) {
+    const { user, loading: authLoading, refreshUser } = useAuth();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [showPayments, setShowPayments] = useState(false);
     const intervalRef = useRef(null);
 
     const fetchData = useCallback(async () => {
         try {
-            const res = await fetch('/api/overview');
-            if (res.ok) setData(await res.json());
-        } catch {}
-        setLoading(false);
-    }, []);
+            const res = await fetch('/api/overview', { credentials: 'same-origin' });
+            if (res.status === 401) {
+                await refreshUser();
+                setLoadError('session');
+                setData(null);
+                return;
+            }
+            if (!res.ok) {
+                setLoadError('Failed to load overview');
+                setData(null);
+                return;
+            }
+            setLoadError('');
+            setData(await res.json());
+        } catch {
+            setLoadError('Could not load overview');
+            setData(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [refreshUser]);
 
     useEffect(() => {
+        if (authLoading || !user) return;
+        setLoading(true);
         fetchData();
         intervalRef.current = setInterval(fetchData, 15000);
         return () => clearInterval(intervalRef.current);
-    }, [fetchData]);
+    }, [authLoading, user, fetchData]);
 
-    if (loading) {
+    if (loading || authLoading) {
         return (
             <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
                 <div className="loading-spinner" />
@@ -324,7 +388,17 @@ function OverviewDashboard({ onClose }) {
         );
     }
 
-    if (!data) return null;
+    if (loadError || !data) {
+        return (
+            <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, flexDirection: 'column', gap: 12, padding: 24 }}>
+                <p>{loadError === 'session' ? 'Session expired. Sign in again.' : loadError || 'No data'}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-primary" onClick={() => { setLoading(true); fetchData(); }}>Try again</button>
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Back to sites</button>
+                </div>
+            </div>
+        );
+    }
 
     const formatAmount = (cents) => `$${(cents / 100).toFixed(2)}`;
     const formatTime = (ts) => {
