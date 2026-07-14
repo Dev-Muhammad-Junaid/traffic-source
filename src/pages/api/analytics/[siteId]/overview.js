@@ -2,11 +2,22 @@ import { getDb } from '@/lib/db';
 import { withAuth } from '@/lib/withAuth';
 import { parseDateRange, verifySiteOwnership } from '@/lib/analytics';
 
-function buildSessionFilters(query, alias = '') {
+function buildSessionFilters(query, alias = '', { excludeDate = false } = {}) {
   const pfx = alias ? `${alias}.` : '';
   const clauses = [];
   const params = [];
 
+  if (query.date && !excludeDate) {
+    const day = String(query.date);
+    if (day.includes(' ')) {
+      // Hourly bucket from 24h chart, e.g. "2026-07-14 08:00"
+      clauses.push(`strftime('%Y-%m-%d %H:00', ${pfx}started_at) = ?`);
+      params.push(day);
+    } else {
+      clauses.push(`date(${pfx}started_at) = ?`);
+      params.push(day);
+    }
+  }
   if (query.channel) {
     if (query.channel === 'Direct') {
       clauses.push(`(${pfx}utm_source IS NULL AND (${pfx}referrer_domain IS NULL OR ${pfx}referrer_domain = ''))`);
@@ -60,6 +71,11 @@ function buildPageViewFilters(query) {
 }
 
 function hasSessionFilters(query) {
+  return query.date || query.channel || query.country || query.city || query.entry_page ||
+    query.exit_page || query.browser || query.os || query.device;
+}
+
+function hasNonDateSessionFilters(query) {
   return query.channel || query.country || query.city || query.entry_page ||
     query.exit_page || query.browser || query.os || query.device;
 }
@@ -91,12 +107,16 @@ export default withAuth(async function handler(req, res) {
 
   const sf = buildSessionFilters(req.query);
   const sfAliased = buildSessionFilters(req.query, 's');
+  // Keep the full-period chart visible when drilling into a single day
+  const sfChartAliased = buildSessionFilters(req.query, 's', { excludeDate: true });
   const pvf = buildPageViewFilters(req.query);
   const useSessionFilters = hasSessionFilters(req.query);
+  const useChartSessionFilters = hasNonDateSessionFilters(req.query) || !!req.query.page;
   const usePageFilter = !!req.query.page;
 
   const sfWhere = sf.clauses.length > 0 ? ' AND ' + sf.clauses.join(' AND ') : '';
   const sfAliasedWhere = sfAliased.clauses.length > 0 ? ' AND ' + sfAliased.clauses.join(' AND ') : '';
+  const sfChartAliasedWhere = sfChartAliased.clauses.length > 0 ? ' AND ' + sfChartAliased.clauses.join(' AND ') : '';
   const pvfWhere = pvf.clauses.length > 0 ? ' AND ' + pvf.clauses.join(' AND ') : '';
 
   // Current period totals — when filters are active, compute from sessions table
@@ -173,9 +193,9 @@ export default withAuth(async function handler(req, res) {
       ? ((previous.total_bounces / previous.total_sessions) * 100).toFixed(1)
       : 0;
 
-  // Time series — when filters active, build from sessions
+  // Time series — keep full period when only a day is selected; still apply other filters
   let timeSeries;
-  if (useSessionFilters || usePageFilter) {
+  if (useChartSessionFilters) {
     const sessionJoinPv = usePageFilter
       ? `INNER JOIN page_views pv ON pv.site_id = s.site_id AND pv.session_id = s.id`
       : '';
@@ -191,10 +211,10 @@ export default withAuth(async function handler(req, res) {
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
            ${sessionJoinPv}
-           WHERE s.site_id = ? AND s.started_at >= datetime('now', '-24 hours')${sfAliasedWhere}${pvFilterClause}
+           WHERE s.site_id = ? AND s.started_at >= datetime('now', '-24 hours')${sfChartAliasedWhere}${pvFilterClause}
            GROUP BY date ORDER BY date ASC`
         )
-        .all(siteId, ...sfAliased.params, ...pvParams);
+        .all(siteId, ...sfChartAliased.params, ...pvParams);
     } else {
       timeSeries = await db
         .prepare(
@@ -204,10 +224,10 @@ export default withAuth(async function handler(req, res) {
                   COALESCE(SUM(s.page_count), 0) as page_views
            FROM sessions s
            ${sessionJoinPv}
-           WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfAliasedWhere}${pvFilterClause}
+           WHERE s.site_id = ? AND datetime(s.started_at) BETWEEN ? AND ?${sfChartAliasedWhere}${pvFilterClause}
            GROUP BY date ORDER BY date ASC`
         )
-        .all(siteId, range.from, dateEnd, ...sfAliased.params, ...pvParams);
+        .all(siteId, range.from, dateEnd, ...sfChartAliased.params, ...pvParams);
     }
   } else {
     if (req.query.period === '24h') {

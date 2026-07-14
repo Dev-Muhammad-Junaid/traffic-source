@@ -13,6 +13,7 @@ import TechIcon from '@/components/ui/TechIcon';
 import ChannelIcon from '@/components/ui/ChannelIcon';
 
 const FILTER_LABELS = {
+  date: 'Day',
   channel: 'Channel',
   country: 'Country',
   city: 'City',
@@ -23,6 +24,17 @@ const FILTER_LABELS = {
   os: 'OS',
   device: 'Device',
 };
+
+function formatFilterDate(value) {
+  if (!value) return value;
+  if (String(value).includes(' ')) {
+    const [day, hour] = String(value).split(' ');
+    const d = new Date(day + 'T00:00:00');
+    return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${hour}`;
+  }
+  const d = new Date(value + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function Analytics() {
   const router = useRouter();
@@ -73,7 +85,7 @@ export default function Analytics() {
               <span key={key} className="filter-pill">
                 <span className="filter-pill-label">{FILTER_LABELS[key] || key}:</span>
                 <span className="filter-pill-value">
-                  {key === 'country' ? getCountryName(value) : value}
+                  {key === 'country' ? getCountryName(value) : key === 'date' ? formatFilterDate(value) : value}
                 </span>
                 <button
                   className="filter-pill-remove"
@@ -105,12 +117,19 @@ export default function Analytics() {
 
         {/* ── Combined Chart (visitors line + revenue bars) ── */}
         <div className="panel" style={{ marginBottom: 20 }}>
-          <div className="chart-container">
-            <CombinedChart
-              trafficData={data.timeSeries}
-              revenueData={data.conversions?.timeSeries || []}
-            />
+          <div className="chart-panel-header">
+            <span className="chart-panel-hint">
+              {filters.date
+                ? `Showing locations for ${formatFilterDate(filters.date)} — click the day again to clear`
+                : 'Click a day to see where traffic came from'}
+            </span>
           </div>
+          <CombinedChart
+            trafficData={data.timeSeries}
+            revenueData={data.conversions?.timeSeries || []}
+            selectedDate={filters.date || null}
+            onDayClick={(date) => toggleFilter('date', date)}
+          />
         </div>
 
         {/* ── Sources + Geography (side by side) ── */}

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 const FilterContext = createContext();
 
-const FILTER_KEYS = ['channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
+const FILTER_KEYS = ['date', 'channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
 
 export function FilterProvider({ children }) {
   const router = useRouter();

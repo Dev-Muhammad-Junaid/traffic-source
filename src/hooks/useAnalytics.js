@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useDateRange } from '@/contexts/DateRangeContext';
 
-const FILTER_KEYS = ['channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
+const FILTER_KEYS = ['date', 'channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
 
 export function useAnalytics(endpoint, extraParams = {}) {
   const [data, setData] = useState(null);
