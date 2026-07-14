@@ -1,18 +1,20 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useDateRange } from '@/contexts/DateRangeContext';
 
-const FILTER_KEYS = ['date', 'channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
+// `date` is intentionally excluded — day drill-down uses the light /geo endpoint
+const FILTER_KEYS = ['channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
 
 export function useAnalytics(endpoint, extraParams = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const router = useRouter();
   const { siteId } = router.query;
   const { getParams } = useDateRange();
+  const hasDataRef = useRef(false);
 
-  // Read filters directly from router.query so we react to URL changes immediately
   const filterParams = useMemo(() => {
     const f = {};
     for (const key of FILTER_KEYS) {
@@ -22,11 +24,17 @@ export function useAnalytics(endpoint, extraParams = {}) {
   }, [router.query]);
 
   const filterKey = JSON.stringify(filterParams);
+  const periodKey = JSON.stringify(getParams());
+  const extraKey = JSON.stringify(extraParams);
 
   const fetchData = useCallback(async () => {
     if (!siteId) return;
-    setLoading(true);
     setError(null);
+    if (hasDataRef.current) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const params = new URLSearchParams({ ...getParams(), ...filterParams, ...extraParams });
       const res = await fetch(
@@ -41,16 +49,18 @@ export function useAnalytics(endpoint, extraParams = {}) {
       }
       if (!res.ok) throw new Error(json.error || 'Failed to fetch');
       setData(json);
+      hasDataRef.current = true;
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [siteId, endpoint, JSON.stringify(getParams()), filterKey, JSON.stringify(extraParams)]);
+  }, [siteId, endpoint, periodKey, filterKey, extraKey]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, refreshing, error, refetch: fetchData };
 }

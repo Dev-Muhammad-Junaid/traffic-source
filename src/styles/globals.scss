@@ -776,6 +776,29 @@ a {
     }
 }
 
+.filter-bar-subtle {
+    justify-content: flex-end;
+    background: transparent;
+    border: none;
+    padding: 0 0 8px;
+    margin-bottom: 8px;
+}
+
+.filter-updating {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.analytics-content.is-refreshing {
+    opacity: 0.78;
+    transition: opacity 0.15s ease;
+}
+
+.analytics-content {
+    transition: opacity 0.15s ease;
+}
+
 .page-link-out {
     display: inline-flex;
     align-items: center;
