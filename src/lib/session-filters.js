@@ -95,3 +95,20 @@ export function hasNonDateSessionFilters(query) {
     query.device
   );
 }
+
+/** Fill missing YYYY-MM-DD points so a country/device filter still shows every day. */
+export function fillDailySeries(rows, from, to) {
+  const map = new Map((rows || []).map((row) => [row.date, row]));
+  const start = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return rows || [];
+  const dayCount = Math.round((end - start) / 86400000) + 1;
+  if (dayCount < 1 || dayCount > 400) return rows || [];
+
+  const out = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const key = cursor.toISOString().slice(0, 10);
+    out.push(map.get(key) || { date: key, visitors: 0, sessions: 0, page_views: 0 });
+  }
+  return out;
+}

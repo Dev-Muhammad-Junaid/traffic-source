@@ -27,7 +27,26 @@ const FILTER_LABELS = {
   device: 'Device',
 };
 
-const GEO_FILTER_KEYS = ['channel', 'country', 'city', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
+const GEO_FILTER_KEYS = ['channel', 'country', 'city', 'page', 'entry_page', 'exit_page', 'browser', 'os', 'device'];
+
+function chartHint(filters) {
+  if (filters.date) {
+    return `Showing country, device, and sources for ${formatFilterDate(filters.date)} — click the day again to clear`;
+  }
+
+  const parts = [];
+  if (filters.country) parts.push(getCountryName(filters.country));
+  if (filters.city) parts.push(filters.city);
+  if (filters.device) parts.push(filters.device);
+  if (filters.browser) parts.push(filters.browser);
+  if (filters.os) parts.push(filters.os);
+  if (filters.channel) parts.push(filters.channel);
+  if (filters.page) parts.push(filters.page);
+  if (parts.length) {
+    return `Chart shows which days had ${parts.join(' · ')} — click a day to narrow further`;
+  }
+  return 'Click a day, country, or device to filter the rest of the dashboard';
+}
 
 function formatFilterDate(value) {
   if (!value) return value;
@@ -110,11 +129,22 @@ export default function Analytics() {
   }
 
   const usingDayGeo = !!filters.date && !!dayGeo;
-  const countries = usingDayGeo ? dayGeo.countries : data.countries || [];
-  const cities = usingDayGeo ? dayGeo.cities : data.cities || [];
-  const current = usingDayGeo ? dayGeo.current : data.current;
+  const countries = (usingDayGeo ? dayGeo.countries : data.countries) || [];
+  const cities = (usingDayGeo ? dayGeo.cities : data.cities) || [];
+  const sources = (usingDayGeo ? dayGeo.sources : data.sources) || [];
+  const pages = (usingDayGeo ? dayGeo.pages : data.pages) || [];
+  const entryPages = (usingDayGeo ? dayGeo.entryPages : data.entryPages) || [];
+  const exitPages = (usingDayGeo ? dayGeo.exitPages : data.exitPages) || [];
+  const browsers = (usingDayGeo ? dayGeo.browsers : data.browsers) || [];
+  const os = (usingDayGeo ? dayGeo.os : data.os) || [];
+  const devices = (usingDayGeo ? dayGeo.devices : data.devices) || [];
+  const current = (usingDayGeo ? dayGeo.current : data.current) || {};
   const conv = data.conversions?.totals || {};
   const isUpdating = refreshing || dayLoading;
+  const hasDimensionFilter = !!(
+    filters.country || filters.city || filters.device || filters.browser ||
+    filters.os || filters.channel || filters.page || filters.entry_page || filters.exit_page
+  );
 
   const toggleFilter = (key, value) => {
     if (filters[key] === value) {
@@ -181,16 +211,13 @@ export default function Analytics() {
 
           <div className="panel" style={{ marginBottom: 20 }}>
             <div className="chart-panel-header">
-              <span className="chart-panel-hint">
-                {filters.date
-                  ? `Showing locations for ${formatFilterDate(filters.date)} — click the day again to clear`
-                  : 'Click a day to see where traffic came from'}
-              </span>
+              <span className="chart-panel-hint">{chartHint(filters)}</span>
             </div>
             <CombinedChart
               trafficData={data.timeSeries}
               revenueData={data.conversions?.timeSeries || []}
               selectedDate={filters.date || null}
+              dimEmptyDays={hasDimensionFilter}
               onDayClick={(date) => toggleFilter('date', date)}
             />
           </div>
@@ -203,9 +230,9 @@ export default function Analytics() {
                 { key: 'utm_campaign', label: 'Campaign' },
               ]}
               data={{
-                referrer: data.sources || [],
-                utm_source: (data.sources || []).filter(s => s.name !== 'Direct'),
-                utm_campaign: (data.sources || []).filter(s => s.name !== 'Direct'),
+                referrer: sources,
+                utm_source: sources.filter(s => s.name !== 'Direct'),
+                utm_campaign: sources.filter(s => s.name !== 'Direct'),
               }}
               valueKey="sessions"
               renderLabel={(row) => (
@@ -253,9 +280,9 @@ export default function Analytics() {
                 { key: 'exit', label: 'Exit page' },
               ]}
               data={{
-                all: (data.pages || []).map(p => ({ ...p, count: p.views })),
-                entry: (data.entryPages || []).map(p => ({ ...p, count: p.sessions })),
-                exit: (data.exitPages || []).map(p => ({ ...p, count: p.sessions })),
+                all: pages.map(p => ({ ...p, count: p.views })),
+                entry: entryPages.map(p => ({ ...p, count: p.sessions })),
+                exit: exitPages.map(p => ({ ...p, count: p.sessions })),
               }}
               renderLabel={(row) => renderPageLabel(row.name, data.site?.domain)}
               showPercentage
@@ -275,9 +302,9 @@ export default function Analytics() {
                 { key: 'device', label: 'Device' },
               ]}
               data={{
-                browser: data.browsers || [],
-                os: data.os || [],
-                device: data.devices || [],
+                browser: browsers,
+                os: os,
+                device: devices,
               }}
               renderLabel={(row, meta) => (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

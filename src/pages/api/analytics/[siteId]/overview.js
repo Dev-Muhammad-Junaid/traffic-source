@@ -6,6 +6,7 @@ import {
   buildPageViewFilters,
   hasSessionFilters,
   hasNonDateSessionFilters,
+  fillDailySeries,
 } from '@/lib/session-filters';
 
 export default withAuth(async function handler(req, res) {
@@ -179,6 +180,10 @@ export default withAuth(async function handler(req, res) {
         )
         .all(siteId, range.from, range.to);
     }
+  }
+
+  if (req.query.period !== '24h') {
+    timeSeries = fillDailySeries(timeSeries, range.from, range.to);
   }
 
   // Helper: apply session filters to a sessions-based query

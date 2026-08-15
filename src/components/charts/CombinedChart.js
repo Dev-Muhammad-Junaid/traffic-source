@@ -15,6 +15,7 @@ export default function CombinedChart({
   revenueData,
   selectedDate,
   onDayClick,
+  dimEmptyDays = false,
 }) {
   const ct = useChartTheme();
   const merged = mergeByDate(trafficData, revenueData);
@@ -38,8 +39,12 @@ export default function CombinedChart({
     onDayClick(date);
   };
 
-  const dimUnselected = (date) =>
-    selectedDate && selectedDate !== date ? 0.35 : 1;
+  const barOpacity = (entry) => {
+    let opacity = 1;
+    if (selectedDate && selectedDate !== entry.date) opacity *= 0.35;
+    if (dimEmptyDays && !(entry.visitors || entry.page_views)) opacity *= 0.22;
+    return opacity;
+  };
 
   return (
     <div className={`chart-container${clickable ? ' chart-clickable' : ''}`}>
@@ -101,7 +106,7 @@ export default function CombinedChart({
               const base = formatChartLabel(label);
               if (!clickable) return base;
               if (selectedDate === label) return `${base} · click to clear`;
-              return `${base} · click for locations`;
+              return `${base} · click to see country, device, and source`;
             }}
           />
           {hasRevenue && (
@@ -118,7 +123,7 @@ export default function CombinedChart({
                 <Cell
                   key={`revenue-${entry.date}`}
                   fill={ct.barRevenue}
-                  opacity={0.75 * dimUnselected(entry.date)}
+                  opacity={0.75 * barOpacity(entry)}
                   stroke={selectedDate === entry.date ? ct.barSecondary : undefined}
                   strokeWidth={selectedDate === entry.date ? 2 : 0}
                 />
@@ -137,7 +142,7 @@ export default function CombinedChart({
               <Cell
                 key={`pv-${entry.date}`}
                 fill={selectedDate === entry.date ? ct.barSecondary : ct.barPrimary}
-                opacity={dimUnselected(entry.date)}
+                opacity={barOpacity(entry)}
               />
             ))}
           </Bar>
@@ -154,7 +159,7 @@ export default function CombinedChart({
                 <Cell
                   key={`visitors-${entry.date}`}
                   fill={ct.barSecondary}
-                  opacity={dimUnselected(entry.date)}
+                  opacity={barOpacity(entry)}
                 />
               ))}
             </Bar>
