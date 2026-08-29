@@ -63,6 +63,7 @@ export default function Analytics() {
   const router = useRouter();
   const { siteId } = router.query;
   const { data, loading, refreshing } = useAnalytics('overview');
+  const { data: eventsData } = useAnalytics('events');
   const { filters, setFilter, removeFilter, clearFilters, hasFilters } = useFilters();
   const { period, customRange, getParams } = useDateRange();
   const [dayGeo, setDayGeo] = useState(null);
@@ -133,6 +134,11 @@ export default function Analytics() {
   const cities = (usingDayGeo ? dayGeo.cities : data.cities) || [];
   const sources = (usingDayGeo ? dayGeo.sources : data.sources) || [];
   const pages = (usingDayGeo ? dayGeo.pages : data.pages) || [];
+  const events = eventsData?.events || [];
+  // "By visitor" ranks the same events by unique visitors rather than raw hits
+  const eventsByVisitor = [...events]
+    .map((e) => ({ ...e, count: e.visitors }))
+    .sort((a, b) => b.count - a.count);
   const entryPages = (usingDayGeo ? dayGeo.entryPages : data.entryPages) || [];
   const exitPages = (usingDayGeo ? dayGeo.exitPages : data.exitPages) || [];
   const browsers = (usingDayGeo ? dayGeo.browsers : data.browsers) || [];
@@ -321,6 +327,27 @@ export default function Analytics() {
               }}
             />
           </div>
+
+          {events.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <AnalyticsPanel
+                tabs={[
+                  { key: 'count', label: 'Events' },
+                  { key: 'visitors', label: 'By visitor' },
+                ]}
+                data={{ count: events, visitors: eventsByVisitor }}
+                valueKey="count"
+                renderValue={(value, row, meta) =>
+                  meta.activeTab === 'visitors'
+                    ? `${row.visitors.toLocaleString()} visitors`
+                    : value.toLocaleString()
+                }
+                showPercentage
+                barByTotal
+                defaultTab="count"
+              />
+            </div>
+          )}
 
           {data.affiliates?.length > 0 && (
             <div className="panel" style={{ marginBottom: 20 }}>

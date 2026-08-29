@@ -24,6 +24,10 @@ export default async function handler(req, res) {
       return res.status(400).end();
     }
 
+    if (data.type !== 'pageview' && data.type !== 'event') {
+      return res.status(400).end();
+    }
+
     const db = await getDb();
 
     const site = await db.prepare('SELECT id FROM sites WHERE id = ?').get(data.site_id);
@@ -94,7 +98,7 @@ export default async function handler(req, res) {
         data.screen_width || null,
         data.screen_height || null
       );
-    } else {
+    } else if (data.type === 'pageview') {
       await db.prepare(
         `UPDATE sessions SET
           exit_page = ?,
@@ -104,6 +108,16 @@ export default async function handler(req, res) {
           duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER)
         WHERE id = ?`
       ).run(data.pathname, data.session_id);
+    } else {
+      // Events keep the session alive but must not touch page_count or the
+      // bounce flag — otherwise adding event tracking would silently distort
+      // pageview counts and bounce rate.
+      await db.prepare(
+        `UPDATE sessions SET
+          last_activity = datetime('now'),
+          duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER)
+        WHERE id = ?`
+      ).run(data.session_id);
     }
 
     if (data.ref) {
@@ -167,6 +181,36 @@ export default async function handler(req, res) {
            WHERE site_id = ? AND date = ?`
         ).run(visitorToday ? 1 : 0, data.site_id, today);
       }
+    }
+
+    if (data.type === 'event') {
+      const name =
+        typeof data.event_name === 'string' ? data.event_name.trim().slice(0, 64) : '';
+      if (!name) {
+        return res.status(400).end();
+      }
+
+      let props = null;
+      if (typeof data.event_props === 'string' && data.event_props.length <= 1024) {
+        try {
+          JSON.parse(data.event_props);
+          props = data.event_props;
+        } catch {
+          // malformed props are dropped; the event itself is still recorded
+        }
+      }
+
+      await db.prepare(
+        `INSERT INTO events (site_id, session_id, visitor_id, name, pathname, props)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(
+        data.site_id,
+        data.session_id,
+        data.visitor_id,
+        name,
+        data.pathname || null,
+        props
+      );
     }
 
     res.status(200).end();

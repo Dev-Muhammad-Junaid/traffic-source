@@ -82,6 +82,36 @@
     }
   }
 
+  // --- Custom events -------------------------------------------------------
+  // window.__ts.track('signup_clicked', { plan: 'pro' })
+  // or, with no JS at all:  <button data-ts-event="signup_clicked">
+  function track(name, props) {
+    if (typeof name !== 'string') return;
+    name = name.trim().slice(0, 64);
+    if (!name) return;
+
+    var payload = { type: 'event', event_name: name };
+    if (props && typeof props === 'object') {
+      try {
+        var encoded = JSON.stringify(props);
+        if (encoded.length <= 1024) payload.event_props = encoded;
+      } catch (e) {
+        // non-serialisable props are dropped rather than blocking the event
+      }
+    }
+    send(payload);
+  }
+
+  // Delegated handler so markup alone is enough to record an event.
+  document.addEventListener(
+    'click',
+    function (e) {
+      var el = e.target && e.target.closest && e.target.closest('[data-ts-event]');
+      if (el) track(el.getAttribute('data-ts-event'));
+    },
+    true
+  );
+
   // Track initial page view
   send({ type: 'pageview' });
 
@@ -105,6 +135,6 @@
     if (location.href !== lastUrl) { lastUrl = location.href; send({ type: 'pageview' }); }
   });
 
-  // Expose for Stripe integration
-  window.__ts = { vid: vid, sid: function () { return getSession(); } };
+  // Expose for Stripe integration and custom event tracking
+  window.__ts = { vid: vid, sid: function () { return getSession(); }, track: track };
 })();

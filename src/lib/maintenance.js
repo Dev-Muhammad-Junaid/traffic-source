@@ -10,7 +10,18 @@ export async function purgeOldPageViews(daysToKeep = 90) {
     .prepare("DELETE FROM page_views WHERE date(timestamp) < ?")
     .run(cutoffStr);
 
-  return { deleted: result.changes };
+  // Events are retained on the same schedule. They accumulate faster than
+  // pageviews (many per visit), so skipping them here would let the table
+  // grow without bound.
+  const events = await db
+    .prepare("DELETE FROM events WHERE date(timestamp) < ?")
+    .run(cutoffStr);
+
+  return {
+    deleted: result.changes,
+    pageViewsDeleted: result.changes,
+    eventsDeleted: events.changes,
+  };
 }
 
 export async function getDatabaseSize() {
@@ -45,6 +56,7 @@ export async function getTableCounts() {
     sites: await count('sites'),
     sessions: await count('sessions'),
     page_views: await count('page_views'),
+    events: await count('events'),
     conversions: await count('conversions'),
     daily_stats: await count('daily_stats'),
   };

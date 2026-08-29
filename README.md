@@ -217,6 +217,39 @@ That's it. The script automatically tracks:
 - Screen dimensions
 - Affiliate referrals (`?ref=affiliate-slug`)
 
+## Custom Events
+
+Record any named interaction — button clicks, plan selections, signups —
+alongside pageviews. Two ways, no extra script needed.
+
+**Markup only** — add `data-ts-event` to any element; clicks are captured
+automatically, including clicks on children:
+
+```html
+<button data-ts-event="signup_clicked">Start free trial</button>
+```
+
+**JavaScript** — for anything that isn't a click:
+
+```javascript
+window.__ts.track('plan_selected', { plan: 'pro', billing: 'annual' });
+```
+
+`track(name, props)` — `name` is trimmed to 64 characters; `props` is optional
+and must serialise to 1KB or less, otherwise it is dropped and the event is
+still recorded. Guard the call (`window.__ts?.track?.(...)`) if your script can
+run before `t.js` has loaded.
+
+Events appear in an **Events** panel on the site's analytics page, ranked by
+total hits or by unique visitors, and respect whatever filters are active
+(country, device, browser, channel, day).
+
+**Events never distort your core metrics.** They do not increment
+`page_views`, do not appear in the Pages report, and do not clear a session's
+bounce flag — a visitor who lands, clicks ten buttons and leaves is still a
+bounce with one pageview. They do refresh session activity, so an engaged
+visitor's session duration reflects the interaction.
+
 ## Stripe Conversion Tracking
 
 1. Go to your site's Settings and add your Stripe Secret Key

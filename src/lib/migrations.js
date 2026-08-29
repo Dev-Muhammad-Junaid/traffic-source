@@ -345,6 +345,30 @@ const migrations = [
       CREATE UNIQUE INDEX idx_sites_public_slug ON sites(public_slug);
     `);
   },
+  // Migration 12: Custom event tracking
+  // Mirrors d1/migrations/0002_events.sql so the SQLite (VPS/local) path and
+  // the Cloudflare D1 path stay schema-identical.
+  (db) => {
+    db.exec(`
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL,
+        session_id TEXT NOT NULL,
+        visitor_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        pathname TEXT,
+        props TEXT,
+        timestamp TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_events_site_time ON events(site_id, timestamp);
+      CREATE INDEX idx_events_site_name ON events(site_id, name, timestamp);
+      CREATE INDEX idx_events_session ON events(session_id);
+      CREATE INDEX idx_events_visitor ON events(site_id, visitor_id);
+    `);
+  },
 ];
 
 export function runMigrations(db) {
