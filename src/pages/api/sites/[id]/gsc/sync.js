@@ -15,7 +15,12 @@ export default withAuth(async function handler(req, res) {
   const link = await getSiteLink(id);
   if (!link) return res.status(400).json({ error: 'Search Console property not linked' });
 
-  const backfill = !link.last_sync_at;
+  // `backfill` forces the full 90-day window. Otherwise syncSite derives the
+  // window from what is already stored, so a site that has fallen behind still
+  // catches up — the old `!link.last_sync_at` check meant an already-synced
+  // site could never re-fetch more than the last 3 days, and any gap was
+  // permanent.
+  const backfill = req.body?.backfill === true || !link.last_sync_at;
   scheduleBackgroundTask(() => syncSite(Number(id), { backfill }));
 
   return res.status(200).json({

@@ -369,6 +369,18 @@ const migrations = [
       CREATE INDEX idx_events_visitor ON events(site_id, visitor_id);
     `);
   },
+  // Migration 13: Track when a GSC sync started.
+  // Without this, a run that dies mid-write leaves status='syncing' with no way
+  // to tell "in flight" from "crashed 100 days ago", and the site is never
+  // synced again. Mirrors d1/migrations/0003_gsc_sync_started.sql.
+  (db) => {
+    db.exec(`
+      ALTER TABLE gsc_site_links ADD COLUMN sync_started_at TEXT;
+      UPDATE gsc_site_links SET status = 'error',
+        last_error = 'Interrupted sync reset by migration'
+        WHERE status = 'syncing';
+    `);
+  },
 ];
 
 export function runMigrations(db) {
