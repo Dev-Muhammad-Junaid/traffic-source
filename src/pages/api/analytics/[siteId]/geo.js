@@ -83,6 +83,12 @@ export default withAuth(async function handler(req, res) {
       `SELECT city as name, COUNT(*) as count`,
       `GROUP BY city ORDER BY count DESC LIMIT 20`
     );
+    const ips = await sessQ(
+      `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND ip IS NOT NULL AND ip != ''`,
+      [siteId, range.from, dateEnd],
+      `SELECT ip as name, MAX(country) as country, COUNT(*) as count`,
+      `GROUP BY ip ORDER BY MAX(started_at) DESC LIMIT 30`
+    );
     const browsers = await sessQ(
       `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND browser IS NOT NULL AND browser != ''`,
       [siteId, range.from, dateEnd],
@@ -133,6 +139,7 @@ export default withAuth(async function handler(req, res) {
       exitPages,
       countries,
       cities,
+      ips,
       browsers,
       os,
       devices,

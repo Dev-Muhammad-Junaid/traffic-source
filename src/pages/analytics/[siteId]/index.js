@@ -132,6 +132,7 @@ export default function Analytics() {
   const usingDayGeo = !!filters.date && !!dayGeo;
   const countries = (usingDayGeo ? dayGeo.countries : data.countries) || [];
   const cities = (usingDayGeo ? dayGeo.cities : data.cities) || [];
+  const ips = (usingDayGeo ? dayGeo.ips : data.ips) || [];
   const sources = (usingDayGeo ? dayGeo.sources : data.sources) || [];
   const pages = (usingDayGeo ? dayGeo.pages : data.pages) || [];
   const events = eventsData?.events || [];
@@ -257,13 +258,24 @@ export default function Analytics() {
               tabs={[
                 { key: 'country', label: 'Country' },
                 { key: 'city', label: 'City' },
+                { key: 'ip', label: 'IP' },
               ]}
               data={{
                 country: countries,
                 city: cities,
+                ip: ips,
               }}
               renderLabel={(row, meta) => {
                 if (meta.activeTab === 'city') return row.name;
+                if (meta.activeTab === 'ip') {
+                  return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <CountryFlag code={row.country} size="s" />
+                      <span>{row.country ? getCountryName(row.country) : 'Unknown'}</span>
+                      <span style={{ fontFamily: 'ui-monospace, monospace' }}>{row.name}</span>
+                    </span>
+                  );
+                }
                 return (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <CountryFlag code={row.name} size="s" />
@@ -273,7 +285,10 @@ export default function Analytics() {
               }}
               showPercentage
               defaultTab="country"
-              onRowClick={(row, tab) => toggleFilter(geoTabToFilter[tab], row.name)}
+              onRowClick={(row, tab) => {
+                if (tab === 'ip') return;
+                toggleFilter(geoTabToFilter[tab], row.name);
+              }}
               activeFilter={{ tab: filters.country ? 'country' : filters.city ? 'city' : null, value: filters.country || filters.city }}
             />
           </div>
