@@ -9,6 +9,16 @@ export const config = {
   },
 };
 
+function clientIp(req) {
+  const cf = req.headers['cf-connecting-ip'];
+  const forwarded = req.headers['x-forwarded-for'];
+  const real = req.headers['x-real-ip'];
+  const raw = cf || (forwarded ? String(forwarded).split(',')[0].trim() : '') || real || '';
+  const ip = String(raw).trim();
+  if (!ip || ip.length > 45) return null;
+  return ip;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -43,6 +53,7 @@ export default async function handler(req, res) {
     const country = req.headers['cf-ipcountry'] || null;
     const city = req.headers['cf-ipcity'] || null;
     const continent = req.headers['cf-ipcontinent'] || null;
+    const ip = clientIp(req);
 
     let referrerDomain = null;
     if (data.referrer) {
@@ -70,10 +81,10 @@ export default async function handler(req, res) {
         `INSERT INTO sessions (
           id, site_id, visitor_id, entry_page, exit_page,
           referrer, referrer_domain, utm_source, utm_medium, utm_campaign,
-          utm_term, utm_content, country, city, continent,
+          utm_term, utm_content, country, city, continent, ip,
           browser, browser_version, os, os_version, device_type,
           screen_width, screen_height
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         data.session_id,
         data.site_id,
@@ -90,6 +101,7 @@ export default async function handler(req, res) {
         country,
         city,
         continent,
+        ip,
         browser.name || null,
         browser.version || null,
         os.name || null,
@@ -105,9 +117,10 @@ export default async function handler(req, res) {
           last_activity = datetime('now'),
           page_count = page_count + 1,
           is_bounce = 0,
-          duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER)
+          duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER),
+          ip = COALESCE(?, ip)
         WHERE id = ?`
-      ).run(data.pathname, data.session_id);
+      ).run(data.pathname, ip, data.session_id);
     } else {
       // Events keep the session alive but must not touch page_count or the
       // bounce flag — otherwise adding event tracking would silently distort
@@ -115,9 +128,10 @@ export default async function handler(req, res) {
       await db.prepare(
         `UPDATE sessions SET
           last_activity = datetime('now'),
-          duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER)
+          duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER),
+          ip = COALESCE(?, ip)
         WHERE id = ?`
-      ).run(data.session_id);
+      ).run(ip, data.session_id);
     }
 
     if (data.ref) {

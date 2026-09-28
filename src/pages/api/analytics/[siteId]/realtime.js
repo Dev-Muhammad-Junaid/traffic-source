@@ -16,7 +16,7 @@ export default withAuth(async function handler(req, res) {
   // Active visitors: most recent session per visitor with last_activity within 5 minutes
   const activeUsers = await db
     .prepare(
-      `SELECT s.visitor_id, s.country, s.browser, s.device_type,
+      `SELECT s.visitor_id, s.country, s.browser, s.device_type, s.ip,
               s.exit_page as current_page, s.last_activity,
               COALESCE(s.utm_source, s.referrer_domain, 'Direct') as source
        FROM sessions s

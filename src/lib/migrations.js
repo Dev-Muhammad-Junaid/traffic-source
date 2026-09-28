@@ -437,6 +437,10 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_bing_pages_site_date ON bing_pages(site_id, date);
     `);
   },
+  // Migration 15: store the visitor IP Cloudflare sees. Mirrors d1/migrations/0005_session_ip.sql.
+  (db) => {
+    db.exec(`ALTER TABLE sessions ADD COLUMN ip TEXT;`);
+  },
 ];
 
 export function runMigrations(db) {

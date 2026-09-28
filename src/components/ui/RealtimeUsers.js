@@ -59,6 +59,7 @@ export default function RealtimeUsers() {
               </div>
               <div className="realtime-row-bottom">
                 <span className="realtime-source">{user.source || 'Direct'}</span>
+                {user.ip && <span className="realtime-source">{user.ip}</span>}
                 <TechIcon type="browser" name={user.browser} />
               </div>
             </div>

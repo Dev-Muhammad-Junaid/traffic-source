@@ -135,6 +135,7 @@ export default function ConversionDrawer({ siteId, conversion, onClose }) {
                       </div>
 
                       <div className="timeline-session-meta">
+                        {session.ip && <span>{session.ip}</span>}
                         {session.country && (
                           <span>
                             <CountryFlag code={session.country} size="s" />

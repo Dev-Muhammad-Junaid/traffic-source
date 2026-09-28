@@ -34,7 +34,7 @@ export default withAuth(async function handler(req, res) {
   // Get ALL sessions for this visitor ordered chronologically
   const sessions = await db.prepare(
     `SELECT id, started_at, last_activity, entry_page, exit_page,
-            country, city, browser, os, device_type,
+            country, city, browser, os, device_type, ip,
             referrer, referrer_domain, utm_source, utm_medium, utm_campaign,
             page_count, duration, is_bounce
      FROM sessions
