@@ -243,33 +243,40 @@ export async function computeTrends(siteId) {
  * Sync every linked site whose data has gone stale. Called by the Cloudflare
  * cron trigger (see worker-entry.js) and by the Node instrumentation loop.
  */
-export async function syncAllConnections({ maxAgeHours = 12, force = false } = {}) {
+export async function syncAllConnections({ maxAgeHours = 12, force = false, userId = null } = {}) {
   if (!(await isGscConfigured())) return { skipped: 'not configured' };
   const db = await getDb();
-  const conns = await db
-    .prepare('SELECT site_id, last_sync_at, status, sync_started_at FROM gsc_site_links')
-    .all();
+  const conns = userId
+    ? await db
+        .prepare(
+          `SELECT l.site_id, l.last_sync_at, l.status, l.sync_started_at
+           FROM gsc_site_links l
+           INNER JOIN sites s ON s.id = l.site_id
+           WHERE s.user_id = ?`
+        )
+        .all(userId)
+    : await db
+        .prepare('SELECT site_id, last_sync_at, status, sync_started_at FROM gsc_site_links')
+        .all();
   const results = [];
   const skipped = [];
 
   for (const c of conns) {
-    if (!force) {
-      // A run that is genuinely in flight should not be started twice. One that
-      // died mid-write leaves status='syncing' forever, so only respect the flag
-      // while it is fresh.
-      if (c.status === 'syncing' && c.sync_started_at) {
-        const startedMs = Date.now() - new Date(c.sync_started_at + 'Z').getTime();
-        if (startedMs < STALE_SYNC_MINUTES * 60 * 1000) {
-          skipped.push({ siteId: c.site_id, reason: 'in progress' });
-          continue;
-        }
+    // A run that is genuinely in flight should not be started twice. One that
+    // died mid-write leaves status='syncing' forever, so only respect the flag
+    // while it is fresh. A manual resync (force) still waits out that window.
+    if (c.status === 'syncing' && c.sync_started_at) {
+      const startedMs = Date.now() - new Date(c.sync_started_at + 'Z').getTime();
+      if (startedMs < STALE_SYNC_MINUTES * 60 * 1000) {
+        skipped.push({ siteId: c.site_id, reason: 'in progress' });
+        continue;
       }
-      if (c.last_sync_at && c.status !== 'error') {
-        const last = new Date(c.last_sync_at + 'Z').getTime();
-        if (Date.now() - last < maxAgeHours * 60 * 60 * 1000) {
-          skipped.push({ siteId: c.site_id, reason: 'fresh' });
-          continue;
-        }
+    }
+    if (!force && c.last_sync_at && c.status !== 'error') {
+      const last = new Date(c.last_sync_at + 'Z').getTime();
+      if (Date.now() - last < maxAgeHours * 60 * 60 * 1000) {
+        skipped.push({ siteId: c.site_id, reason: 'fresh' });
+        continue;
       }
     }
     try {

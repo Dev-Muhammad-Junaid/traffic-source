@@ -156,6 +156,7 @@ function GscIntegration() {
   const [err, setErr] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
     const [r1, r2] = await Promise.all([
@@ -211,6 +212,26 @@ function GscIntegration() {
     if (!confirm('Remove Google Search Console credentials? Existing site connections will stop syncing.')) return;
     await fetch('/api/settings/integrations/gsc/credentials', { method: 'DELETE' });
     load();
+  };
+
+  const resyncAll = async () => {
+    setSyncing(true);
+    setErr('');
+    setMsg('');
+    try {
+      const r = await fetch('/api/settings/integrations/gsc/sync-all', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErr(d.error || 'Could not start sync');
+        return;
+      }
+      const names = (d.sites || []).map((site) => site.domain || site.name).join(', ');
+      setMsg(`${d.message || 'Sync started.'}${names ? ` ${names}.` : ''} Google’s data lags 2–3 days, so refresh a Search Console page in a minute.`);
+    } catch {
+      setErr('Could not start sync');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const copyRedirect = () => {
@@ -285,10 +306,20 @@ function GscIntegration() {
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Save your OAuth credentials above first.</p>
         )}
         {state.configured && conn?.connected && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
-            <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Connected</span>
-            <span style={{ color: 'var(--text-muted)' }}>{conn.email}</span>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={disconnectGoogle}>Disconnect</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Connected</span>
+              <span style={{ color: 'var(--text-muted)' }}>{conn.email}</span>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={disconnectGoogle}>Disconnect</button>
+            </div>
+            <div>
+              <button type="button" className="btn btn-primary btn-sm" onClick={resyncAll} disabled={syncing}>
+                {syncing ? 'Starting sync…' : 'Resync all sites'}
+              </button>
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                Pulls the latest Search Console data for every site linked to this Google account.
+              </p>
+            </div>
           </div>
         )}
         {state.configured && !conn?.connected && (
