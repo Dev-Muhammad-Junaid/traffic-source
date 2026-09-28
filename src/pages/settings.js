@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import BingIntegration from '@/components/settings/BingIntegration';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Settings() {
@@ -59,7 +60,12 @@ export default function Settings() {
                   </button>
                 </form>
               )}
-              {tab === 'integrations' && <GscIntegration />}
+              {tab === 'integrations' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <GscIntegration />
+                  <BingIntegration />
+                </div>
+              )}
               {tab === 'backups' && <BackupSettings />}
             </div>
           </div>

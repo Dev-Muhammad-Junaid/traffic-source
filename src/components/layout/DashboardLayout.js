@@ -62,6 +62,12 @@ export default function DashboardLayout({ children, siteId, siteName, siteDomain
                     Search Console
                   </Link>
                   <Link
+                    href={`/analytics/${siteId}/bing`}
+                    className={`app-nav-link ${path.includes('/bing') ? 'active' : ''}`}
+                  >
+                    Bing
+                  </Link>
+                  <Link
                     href={`/analytics/${siteId}/settings`}
                     className={`app-nav-link ${path.includes('/settings') && path.includes('/analytics/') ? 'active' : ''}`}
                   >

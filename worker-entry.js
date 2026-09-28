@@ -22,6 +22,8 @@ const CRON_ROUTES = {
 	// Google Search Console sync. syncAllConnections() skips any site synced in
 	// the last 12h, so running every 6h just means a missed run heals quickly.
 	"0 */6 * * *": "/api/cron/gsc-sync",
+	// Bing keyword and page stats refresh weekly. A daily pull is enough.
+	"15 4 * * *": "/api/cron/bing-sync",
 };
 
 export default {
