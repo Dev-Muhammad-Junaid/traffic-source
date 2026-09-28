@@ -9,10 +9,10 @@
  * This wraps the generated worker and adds scheduled(), keeping fetch and the
  * Durable Object exports untouched.
  *
- * The scheduled handler dispatches through the WORKER_SELF_REFERENCE service
- * binding rather than calling the sync library directly: the Next.js request
- * context (D1 binding, env, AsyncLocalStorage) is set up by OpenNext's fetch
- * path, and is not available in a raw scheduled invocation.
+ * The scheduled handler calls OpenNext's fetch() with the cron env and ctx.
+ * That is what installs the D1 request context. Do not await a service binding
+ * back into this same Worker: the scheduled invocation deadlocks and the sync
+ * route never runs.
  */
 import worker from "./.open-next/worker.js";
 
@@ -28,10 +28,19 @@ export default {
 	fetch: worker.fetch,
 
 	async scheduled(controller, env, ctx) {
-		const path = CRON_ROUTES[controller.cron];
+		let path = CRON_ROUTES[controller.cron];
 		if (!path) {
-			console.error(`[cron] no route for schedule "${controller.cron}"`);
-			return;
+			const only = Object.entries(CRON_ROUTES);
+			// Cloudflare sometimes hands the cron back in a normalized form that
+			// no longer matches the key in wrangler.jsonc. With a single job,
+			// run that job instead of returning and leaving Search Console stale.
+			if (only.length === 1) {
+				console.error(`[cron] schedule "${controller.cron}" did not match "${only[0][0]}"; running ${only[0][1]}`);
+				path = only[0][1];
+			} else {
+				console.error(`[cron] no route for schedule "${controller.cron}"`);
+				return;
+			}
 		}
 
 		const base = env.NEXT_PUBLIC_APP_URL || "https://analytics.widgetsflow.com";
@@ -41,14 +50,15 @@ export default {
 				"content-type": "application/json",
 				...(env.CRON_SECRET ? { "x-cron-secret": env.CRON_SECRET } : {}),
 			},
+			body: "{}",
 		});
 
-		const dispatch = env.WORKER_SELF_REFERENCE
-			? env.WORKER_SELF_REFERENCE.fetch(request)
-			: worker.fetch(request, env, ctx);
-
+		// Call OpenNext's fetch directly. Awaiting WORKER_SELF_REFERENCE.fetch()
+		// here deadlocks: that binding is this same Worker, and a scheduled
+		// invocation that waits on itself never reaches /api/cron/gsc-sync.
+		// OpenNext's fetch sets up the D1 request context from env and ctx.
 		try {
-			const response = await dispatch;
+			const response = await worker.fetch(request, env, ctx);
 			const body = await response.text();
 			console.log(`[cron] ${path} -> ${response.status} ${body.slice(0, 500)}`);
 		} catch (err) {
