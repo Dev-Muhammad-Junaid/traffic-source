@@ -17,7 +17,9 @@ async function replaceRows(db, table, siteId, statements) {
 
 export async function autoLinkSites(userId) {
   const db = await getDb();
-  const sites = await db.prepare('SELECT id, domain FROM sites WHERE user_id = ?').all(userId);
+  const sites = userId
+    ? await db.prepare('SELECT id, domain FROM sites WHERE user_id = ?').all(userId)
+    : await db.prepare('SELECT id, domain FROM sites').all();
   const bingSites = (await listBingSites()).filter((site) => site.IsVerified);
   const linked = [];
   for (const site of sites) {
@@ -127,6 +129,7 @@ export async function syncBingSite(siteId) {
 
 export async function syncAllBing({ maxAgeHours = 20, force = false, userId = null } = {}) {
   if (!(await getBingApiKey())) return { skipped: 'not configured' };
+  await autoLinkSites(userId);
   const db = await getDb();
   const links = userId
     ? await db.prepare(

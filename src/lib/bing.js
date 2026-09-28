@@ -32,7 +32,10 @@ export function parseBingDate(value) {
 export async function getBingApiKey() {
   const db = await getDb();
   const row = await db.prepare("SELECT value FROM app_settings WHERE key = 'bing_api_key'").get();
-  return decrypt(row?.value) || null;
+  const stored = decrypt(row?.value);
+  if (stored) return stored;
+  const fromEnv = process.env.BING_WEBMASTER_API_KEY?.trim();
+  return fromEnv || null;
 }
 
 export async function saveBingApiKey(apiKey) {
