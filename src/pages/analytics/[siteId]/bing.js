@@ -35,17 +35,6 @@ export default function BingPage() {
     setTimeout(load, 4000);
   };
 
-  const syncAll = async () => {
-    setSyncing(true);
-    setError('');
-    const res = await fetch('/api/settings/integrations/bing/sync-all', { method: 'POST' });
-    const body = await res.json().catch(() => ({}));
-    setSyncing(false);
-    if (!res.ok) { setError(body.error || 'Could not start sync'); return; }
-    setNote(body.message || 'Sync started.');
-    setTimeout(load, 4000);
-  };
-
   const link = async (bingUrl) => {
     setError('');
     const res = await fetch(`/api/sites/${siteId}/bing/link`, {
@@ -75,7 +64,7 @@ export default function BingPage() {
         {!data.configured && <NeedsKey />}
         {data.configured && !data.linked && <LinkPanel data={data} onLink={link} />}
         {data.configured && data.linked && (
-          <Dashboard data={data} onSync={syncThis} onSyncAll={syncAll} syncing={syncing} />
+          <Dashboard data={data} onSync={syncThis} syncing={syncing} />
         )}
       </DashboardLayout>
     </>
@@ -110,7 +99,7 @@ function LinkPanel({ data, onLink }) {
   );
 }
 
-function Dashboard({ data, onSync, onSyncAll, syncing }) {
+function Dashboard({ data, onSync, syncing }) {
   const totals = data.totals || {};
   const latestCrawl = data.crawl?.[0];
   const chart = (data.daily || []).map((row) => ({ date: row.date, page_views: row.clicks, impressions: row.impressions }));
@@ -121,8 +110,7 @@ function Dashboard({ data, onSync, onSyncAll, syncing }) {
         <span>Property: <strong style={{ color: 'var(--text)' }}>{data.link.url}</strong></span>
         {data.link.lastSyncAt && <span>Last sync {data.link.lastSyncAt} UTC</span>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button type="button" className="btn btn-primary btn-sm" onClick={onSyncAll} disabled={syncing}>Resync all sites</button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onSync} disabled={syncing}>Resync this site</button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onSync} disabled={syncing}>{syncing ? 'Starting…' : 'Sync now'}</button>
         </div>
       </div>
       {data.link.lastError && <div className="auth-error" style={{ marginBottom: 16 }}>{data.link.lastError}</div>}

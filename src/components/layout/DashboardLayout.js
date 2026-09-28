@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import ProtectedRoute from '../ProtectedRoute';
@@ -78,6 +79,7 @@ export default function DashboardLayout({ children, siteId, siteName, siteDomain
             </nav>
           </div>
           <div className="app-header-right">
+            <ResyncAllSites />
             <Link href="/settings" className={`app-nav-link ${path === '/settings' ? 'active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
@@ -142,5 +144,35 @@ export default function DashboardLayout({ children, siteId, siteName, siteDomain
         </main>
       </div>
     </ProtectedRoute>
+  );
+}
+
+function ResyncAllSites() {
+  const [state, setState] = useState('');
+
+  const run = async () => {
+    setState('Starting…');
+    const calls = await Promise.all([
+      fetch('/api/settings/integrations/gsc/sync-all', { method: 'POST' }),
+      fetch('/api/settings/integrations/bing/sync-all', { method: 'POST' }),
+    ]);
+    const bodies = await Promise.all(calls.map((res) => res.json().catch(() => ({}))));
+    const started = bodies.filter((body, i) => calls[i].ok).map((body) => body.message).filter(Boolean);
+    const problems = bodies.filter((body, i) => !calls[i].ok).map((body) => body.error).filter(Boolean);
+    if (started.length) setState(started.join(' '));
+    else if (problems.length) setState(problems[0]);
+    else setState('Nothing to sync');
+    setTimeout(() => setState(''), 8000);
+  };
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={run} disabled={state === 'Starting…'}>
+        {state === 'Starting…' ? 'Starting…' : 'Resync all sites'}
+      </button>
+      {state && state !== 'Starting…' && (
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 220 }}>{state}</span>
+      )}
+    </span>
   );
 }

@@ -95,22 +95,6 @@ export default function GscPage() {
     load();
   };
 
-  const resyncAll = async () => {
-    setSyncing(true);
-    setPageError('');
-    const r = await fetch('/api/settings/integrations/gsc/sync-all', { method: 'POST' });
-    const d = await r.json().catch(() => ({}));
-    setSyncing(false);
-    if (!r.ok) {
-      setPageError(d.error || 'Could not start sync');
-      return;
-    }
-    const names = (d.sites || []).map((site) => site.domain || site.name).join(', ');
-    setPageError('');
-    setSyncNote(`${d.message || 'Sync started.'}${names ? ` ${names}.` : ''} Refresh in a minute.`);
-    load();
-  };
-
   if (loading || !data) {
     return (
       <DashboardLayout siteId={siteId}>
@@ -142,7 +126,7 @@ export default function GscPage() {
         )}
 
         {data.googleConnected && data.linked && (
-          <Dashboard data={data} onUnlink={unlink} onSync={triggerSync} onSyncAll={resyncAll} syncing={syncing} />
+          <Dashboard data={data} onUnlink={unlink} onSync={triggerSync} syncing={syncing} />
         )}
       </DashboardLayout>
     </>
@@ -200,7 +184,7 @@ function PropertyPicker({ properties, selectedProp, setSelectedProp, onLink, lin
 // Dashboard
 // ─────────────────────────────────────────────────────────────────
 
-function Dashboard({ data, onUnlink, onSync, onSyncAll, syncing }) {
+function Dashboard({ data, onUnlink, onSync, syncing }) {
   const t = data.totals || {};
   const clicks = t.clicks || 0;
   const clicksPrev = t.clicks_prev || 0;
@@ -219,11 +203,8 @@ function Dashboard({ data, onUnlink, onSync, onSyncAll, syncing }) {
         <span>{data.googleEmail}</span>
         {data.link.lastSyncAt && <><span>·</span><span>Last sync {timeAgo(data.link.lastSyncAt)}</span></>}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-primary btn-sm" onClick={onSyncAll} disabled={syncing}>
-            {syncing ? 'Starting…' : 'Resync all sites'}
-          </button>
           <button type="button" className="btn btn-secondary btn-sm" onClick={onSync} disabled={syncing}>
-            {syncing ? 'Starting…' : 'Resync this site'}
+            {syncing ? 'Starting…' : 'Sync now'}
           </button>
           <button className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={onUnlink}>
             <LuUnlink size={14} /> Unlink
@@ -239,7 +220,7 @@ function Dashboard({ data, onUnlink, onSync, onSyncAll, syncing }) {
         <div className="panel" style={{ padding: 16, marginBottom: 16, fontSize: 13 }}>
           {data.link.status === 'syncing'
             ? 'Initial backfill is running… this page will refresh automatically.'
-            : 'Initial backfill has not completed yet. Use Resync this site to start it.'}
+            : 'Initial backfill has not completed yet. Use Sync now to start it.'}
         </div>
       )}
 

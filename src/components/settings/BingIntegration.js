@@ -4,7 +4,6 @@ export default function BingIntegration() {
   const [state, setState] = useState(null);
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
@@ -44,16 +43,6 @@ export default function BingIntegration() {
     load();
   };
 
-  const resync = async () => {
-    setSyncing(true);
-    setErr('');
-    const res = await fetch('/api/settings/integrations/bing/sync-all', { method: 'POST' });
-    const body = await res.json().catch(() => ({}));
-    setSyncing(false);
-    if (!res.ok) { setErr(body.error || 'Could not start sync'); return; }
-    setMsg(body.message || 'Sync started.');
-  };
-
   if (!state) return <div className="loading-inline"><div className="loading-spinner" /></div>;
 
   return (
@@ -70,7 +59,6 @@ export default function BingIntegration() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
           <span style={{ color: 'var(--success)', fontWeight: 600 }}>Key saved</span>
           <span style={{ color: 'var(--text-muted)' }}>{state.masked}</span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={resync} disabled={syncing}>{syncing ? 'Starting…' : 'Resync all sites'}</button>
           <button type="button" className="btn btn-secondary btn-sm" onClick={remove}>Remove</button>
         </div>
       )}

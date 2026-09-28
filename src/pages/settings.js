@@ -162,7 +162,6 @@ function GscIntegration() {
   const [err, setErr] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
     const [r1, r2] = await Promise.all([
@@ -218,26 +217,6 @@ function GscIntegration() {
     if (!confirm('Remove Google Search Console credentials? Existing site connections will stop syncing.')) return;
     await fetch('/api/settings/integrations/gsc/credentials', { method: 'DELETE' });
     load();
-  };
-
-  const resyncAll = async () => {
-    setSyncing(true);
-    setErr('');
-    setMsg('');
-    try {
-      const r = await fetch('/api/settings/integrations/gsc/sync-all', { method: 'POST' });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setErr(d.error || 'Could not start sync');
-        return;
-      }
-      const names = (d.sites || []).map((site) => site.domain || site.name).join(', ');
-      setMsg(`${d.message || 'Sync started.'}${names ? ` ${names}.` : ''} Google’s data lags 2–3 days, so refresh a Search Console page in a minute.`);
-    } catch {
-      setErr('Could not start sync');
-    } finally {
-      setSyncing(false);
-    }
   };
 
   const copyRedirect = () => {
@@ -319,11 +298,8 @@ function GscIntegration() {
               <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={disconnectGoogle}>Disconnect</button>
             </div>
             <div>
-              <button type="button" className="btn btn-primary btn-sm" onClick={resyncAll} disabled={syncing}>
-                {syncing ? 'Starting sync…' : 'Resync all sites'}
-              </button>
               <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-                Pulls the latest Search Console data for every site linked to this Google account.
+                Use Resync all sites in the header to pull Search Console for every linked site.
               </p>
             </div>
           </div>

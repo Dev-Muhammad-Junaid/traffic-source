@@ -51,6 +51,18 @@ export async function clearBingApiKey() {
   await db.prepare("DELETE FROM app_settings WHERE key = 'bing_api_key'").run();
 }
 
+export function explainBingError(message) {
+  const text = String(message || '');
+  if (text.includes('ThrottleIP') || text.includes('Throttle')) {
+    return 'Bing is rate-limiting this server (ThrottleIP). Too many API calls were made in a short time. Wait about 15 minutes, then use Sync now.';
+  }
+  return text.slice(0, 500);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function bingGet(method, params = {}) {
   const apiKey = params.apikey || await getBingApiKey();
   if (!apiKey) throw new Error('Bing Webmaster API key is not configured');
@@ -60,13 +72,21 @@ export async function bingGet(method, params = {}) {
     if (key === 'apikey' || value == null || value === '') continue;
     url.searchParams.set(key, String(value));
   }
-  const res = await fetch(url);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ErrorCode) {
-    throw new Error(data.Message || `Bing ${method} failed (${res.status})`);
+
+  let lastMessage = `Bing ${method} failed`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && !data.ErrorCode) {
+      const rows = data.d;
+      return Array.isArray(rows) ? rows : [];
+    }
+    lastMessage = data.Message || `Bing ${method} failed (${res.status})`;
+    const throttled = String(lastMessage).includes('Throttle');
+    if (!throttled || attempt === 2) break;
+    await wait(20000 * (attempt + 1));
   }
-  const rows = data.d;
-  return Array.isArray(rows) ? rows : [];
+  throw new Error(explainBingError(lastMessage));
 }
 
 export async function listBingSites(apiKey) {

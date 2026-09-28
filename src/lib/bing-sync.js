@@ -1,7 +1,11 @@
 import { getDb } from './db';
-import { bingGet, getBingApiKey, hostOf, listBingSites, parseBingDate } from './bing';
+import { bingGet, explainBingError, getBingApiKey, hostOf, listBingSites, parseBingDate } from './bing';
 
 const STALE_SYNC_MINUTES = 20;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function replaceRows(db, table, siteId, statements) {
   const wipe = { sql: `DELETE FROM ${table} WHERE site_id = ?`, params: [siteId] };
@@ -49,16 +53,20 @@ export async function syncBingSite(siteId) {
   const fail = async (message) => {
     await db.prepare(
       "UPDATE bing_site_links SET status = 'error', last_error = ? WHERE site_id = ?"
-    ).run(String(message).slice(0, 500), siteId);
+    ).run(explainBingError(message), siteId);
     return { error: message };
   };
 
   let traffic, queries, pages, crawl;
   try {
-    traffic = await bingGet('GetRankAndTrafficStats', { siteUrl: link.bing_url });
-    queries = await bingGet('GetQueryStats', { siteUrl: link.bing_url });
-    pages = await bingGet('GetPageStats', { siteUrl: link.bing_url });
-    crawl = await bingGet('GetCrawlStats', { siteUrl: link.bing_url });
+    const siteUrl = link.bing_url;
+    traffic = await bingGet('GetRankAndTrafficStats', { siteUrl });
+    await wait(1500);
+    queries = await bingGet('GetQueryStats', { siteUrl });
+    await wait(1500);
+    pages = await bingGet('GetPageStats', { siteUrl });
+    await wait(1500);
+    crawl = await bingGet('GetCrawlStats', { siteUrl });
   } catch (err) {
     return fail(err.message);
   }
@@ -156,10 +164,14 @@ export async function syncAllBing({ maxAgeHours = 20, force = false, userId = nu
       }
     }
     try {
-      results.push({ siteId: link.site_id, ...(await syncBingSite(link.site_id)) });
+      const result = await syncBingSite(link.site_id);
+      results.push({ siteId: link.site_id, ...result });
+      if (String(result.error || '').includes('Throttle')) break;
     } catch (err) {
       results.push({ siteId: link.site_id, error: err.message });
+      if (String(err.message || '').includes('Throttle')) break;
     }
+    await wait(2000);
   }
   return { synced: results.length, results, skipped };
 }
