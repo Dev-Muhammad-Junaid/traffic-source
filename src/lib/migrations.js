@@ -450,6 +450,25 @@ const migrations = [
       ALTER TABLE sessions ADD COLUMN asn TEXT;
     `);
   },
+  // Migration 17: cached IP network details. Mirrors d1/migrations/0007_ip_details.sql.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ip_details (
+        ip TEXT PRIMARY KEY,
+        country TEXT,
+        region TEXT,
+        city TEXT,
+        timezone TEXT,
+        isp TEXT,
+        org TEXT,
+        asn TEXT,
+        mobile INTEGER DEFAULT 0,
+        proxy INTEGER DEFAULT 0,
+        hosting INTEGER DEFAULT 0,
+        looked_up_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+  },
 ];
 
 export function runMigrations(db) {

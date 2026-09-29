@@ -799,6 +799,33 @@ a {
     transition: opacity 0.15s ease;
 }
 
+.ip-details {
+    padding: 8px 16px 14px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.ip-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    margin: 0;
+
+    div {
+        min-width: 0;
+    }
+
+    dt {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    dd {
+        margin: 0;
+        font-size: 13px;
+        word-break: break-all;
+    }
+}
+
 .page-link-out {
     display: inline-flex;
     align-items: center;

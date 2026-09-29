@@ -268,14 +268,10 @@ export default function Analytics() {
               renderLabel={(row, meta) => {
                 if (meta.activeTab === 'city') return row.name;
                 if (meta.activeTab === 'ip') {
-                  const place = [row.city, row.region, row.country ? getCountryName(row.country) : null].filter(Boolean).join(', ');
-                  const network = [row.isp, row.asn].filter(Boolean).join(' · ');
                   return (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       <CountryFlag code={row.country} size="s" />
                       <span style={{ fontFamily: 'ui-monospace, monospace' }}>{row.name}</span>
-                      {place && <span>{place}</span>}
-                      {network && <span style={{ color: 'var(--text-muted)' }}>{network}</span>}
                     </span>
                   );
                 }
@@ -288,6 +284,7 @@ export default function Analytics() {
               }}
               showPercentage
               defaultTab="country"
+              renderDetails={(row) => <IpDetails siteId={siteId} ip={row.name} fallback={row} />}
               onRowClick={(row, tab) => {
                 if (tab === 'ip') return;
                 toggleFilter(geoTabToFilter[tab], row.name);
@@ -446,6 +443,52 @@ export default function Analytics() {
 
       </DashboardLayout>
     </>
+  );
+}
+
+function IpDetails({ siteId, ip, fallback }) {
+  const [details, setDetails] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/analytics/${siteId}/ip-info?ip=${encodeURIComponent(ip)}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'Lookup failed');
+        if (!cancelled) setDetails(body);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => { cancelled = true; };
+  }, [siteId, ip]);
+
+  const info = details || fallback;
+  const place = [info.city, info.region, info.country && info.country.length === 2 ? getCountryName(info.country) : info.country].filter(Boolean).join(', ');
+  const rows = [
+    ['IP', ip],
+    ['Place', place || '—'],
+    ['Timezone', info.timezone || '—'],
+    ['ISP', info.isp || '—'],
+    ['Organization', info.org || info.isp || '—'],
+    ['Network', info.asn || '—'],
+    ['Connection', info.connection || '—'],
+  ];
+
+  return (
+    <div>
+      {error && !details && <p style={{ margin: '0 0 8px', color: 'var(--text-muted)' }}>{error}</p>}
+      {!details && !error && <p style={{ margin: '0 0 8px', color: 'var(--text-muted)' }}>Loading network details…</p>}
+      <dl className="ip-details-grid">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 

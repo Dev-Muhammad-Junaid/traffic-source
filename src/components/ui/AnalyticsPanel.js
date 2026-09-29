@@ -12,8 +12,10 @@ export default function AnalyticsPanel({
   barByTotal = false,
   onRowClick,
   activeFilter,
+  renderDetails,
 }) {
   const [activeTab, setActiveTab] = useState(defaultTab || (tabs && tabs[0]?.key));
+  const [expanded, setExpanded] = useState(null);
 
   const activeData = tabs ? data?.[activeTab] || [] : data || [];
   const totalValue = activeData.reduce((sum, row) => sum + (row[valueKey] || 0), 0);
@@ -50,31 +52,43 @@ export default function AnalyticsPanel({
               : formatNumber(rowValue);
 
             const isActive = activeFilter && activeFilter.tab === activeTab && activeFilter.value === row[labelKey];
-            const clickable = !!onRowClick;
+            const canExpand = !!renderDetails && activeTab === 'ip';
+            const clickable = canExpand || !!onRowClick;
+            const isOpen = canExpand && expanded === row[labelKey];
 
             return (
-              <div
-                className={`analytics-row${clickable ? ' clickable' : ''}${isActive ? ' row-active' : ''}`}
-                key={i}
-                onClick={clickable ? () => onRowClick(row, activeTab) : undefined}
-              >
+              <div key={i}>
                 <div
-                  className="analytics-row-bar"
-                  style={{ width: `${barPct}%` }}
-                />
-                <div className="analytics-row-name">
-                  {renderLabel
-                    ? renderLabel(row, { sharePct, barPct, activeTab })
-                    : row[labelKey]}
+                  className={`analytics-row${clickable ? ' clickable' : ''}${isActive || isOpen ? ' row-active' : ''}`}
+                  onClick={clickable ? () => {
+                    if (canExpand) {
+                      setExpanded(isOpen ? null : row[labelKey]);
+                      return;
+                    }
+                    onRowClick(row, activeTab);
+                  } : undefined}
+                >
+                  <div
+                    className="analytics-row-bar"
+                    style={{ width: `${barPct}%` }}
+                  />
+                  <div className="analytics-row-name">
+                    {renderLabel
+                      ? renderLabel(row, { sharePct, barPct, activeTab })
+                      : row[labelKey]}
+                  </div>
+                  <div className="analytics-row-value">
+                    {displayValue}
+                    {showPercentage && (
+                      <span className="analytics-row-percent">
+                        {formatPercent(sharePct)}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="analytics-row-value">
-                  {displayValue}
-                  {showPercentage && (
-                    <span className="analytics-row-percent">
-                      {formatPercent(sharePct)}
-                    </span>
-                  )}
-                </div>
+                {isOpen && (
+                  <div className="ip-details">{renderDetails(row)}</div>
+                )}
               </div>
             );
           })
