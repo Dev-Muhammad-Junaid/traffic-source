@@ -1,3 +1,4 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getDb } from '@/lib/db';
 const UAParser = require('ua-parser-js');
 
@@ -8,6 +9,27 @@ export const config = {
     },
   },
 };
+
+function networkFromRequest(req) {
+  let cf = {};
+  try {
+    cf = getCloudflareContext()?.cf || {};
+  } catch {
+    // Local Node has no Cloudflare request metadata.
+  }
+  const header = (name) => req.headers[name] || null;
+  const asn = cf.asn ? `AS${cf.asn}` : null;
+  const isp = cf.asOrganization ? String(cf.asOrganization).slice(0, 120) : null;
+  return {
+    country: header('cf-ipcountry') || cf.country || null,
+    city: header('cf-ipcity') || cf.city || null,
+    continent: header('cf-ipcontinent') || cf.continent || null,
+    region: cf.region || header('cf-region') || null,
+    timezone: cf.timezone || header('cf-timezone') || null,
+    isp,
+    asn,
+  };
+}
 
 function clientIp(req) {
   const cf = req.headers['cf-connecting-ip'];
@@ -50,9 +72,10 @@ export default async function handler(req, res) {
     const os = ua.getOS();
     const device = ua.getDevice();
 
-    const country = req.headers['cf-ipcountry'] || null;
-    const city = req.headers['cf-ipcity'] || null;
-    const continent = req.headers['cf-ipcontinent'] || null;
+    const network = networkFromRequest(req);
+    const country = network.country;
+    const city = network.city;
+    const continent = network.continent;
     const ip = clientIp(req);
 
     let referrerDomain = null;
@@ -81,10 +104,10 @@ export default async function handler(req, res) {
         `INSERT INTO sessions (
           id, site_id, visitor_id, entry_page, exit_page,
           referrer, referrer_domain, utm_source, utm_medium, utm_campaign,
-          utm_term, utm_content, country, city, continent, ip,
+          utm_term, utm_content, country, city, continent, region, timezone, ip, isp, asn,
           browser, browser_version, os, os_version, device_type,
           screen_width, screen_height
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         data.session_id,
         data.site_id,
@@ -101,7 +124,11 @@ export default async function handler(req, res) {
         country,
         city,
         continent,
+        network.region,
+        network.timezone,
         ip,
+        network.isp,
+        network.asn,
         browser.name || null,
         browser.version || null,
         os.name || null,
@@ -118,9 +145,13 @@ export default async function handler(req, res) {
           page_count = page_count + 1,
           is_bounce = 0,
           duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER),
-          ip = COALESCE(?, ip)
+          ip = COALESCE(?, ip),
+          isp = COALESCE(?, isp),
+          asn = COALESCE(?, asn),
+          region = COALESCE(?, region),
+          timezone = COALESCE(?, timezone)
         WHERE id = ?`
-      ).run(data.pathname, ip, data.session_id);
+      ).run(data.pathname, ip, network.isp, network.asn, network.region, network.timezone, data.session_id);
     } else {
       // Events keep the session alive but must not touch page_count or the
       // bounce flag — otherwise adding event tracking would silently distort
@@ -129,9 +160,13 @@ export default async function handler(req, res) {
         `UPDATE sessions SET
           last_activity = datetime('now'),
           duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER),
-          ip = COALESCE(?, ip)
+          ip = COALESCE(?, ip),
+          isp = COALESCE(?, isp),
+          asn = COALESCE(?, asn),
+          region = COALESCE(?, region),
+          timezone = COALESCE(?, timezone)
         WHERE id = ?`
-      ).run(ip, data.session_id);
+      ).run(ip, network.isp, network.asn, network.region, network.timezone, data.session_id);
     }
 
     if (data.ref) {

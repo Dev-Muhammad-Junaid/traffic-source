@@ -268,11 +268,14 @@ export default function Analytics() {
               renderLabel={(row, meta) => {
                 if (meta.activeTab === 'city') return row.name;
                 if (meta.activeTab === 'ip') {
+                  const place = [row.city, row.region, row.country ? getCountryName(row.country) : null].filter(Boolean).join(', ');
+                  const network = [row.isp, row.asn].filter(Boolean).join(' · ');
                   return (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <CountryFlag code={row.country} size="s" />
-                      <span>{row.country ? getCountryName(row.country) : 'Unknown'}</span>
                       <span style={{ fontFamily: 'ui-monospace, monospace' }}>{row.name}</span>
+                      {place && <span>{place}</span>}
+                      {network && <span style={{ color: 'var(--text-muted)' }}>{network}</span>}
                     </span>
                   );
                 }

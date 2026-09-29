@@ -441,6 +441,15 @@ const migrations = [
   (db) => {
     db.exec(`ALTER TABLE sessions ADD COLUMN ip TEXT;`);
   },
+  // Migration 16: ISP, ASN, region, timezone. Mirrors d1/migrations/0006_session_network.sql.
+  (db) => {
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN region TEXT;
+      ALTER TABLE sessions ADD COLUMN timezone TEXT;
+      ALTER TABLE sessions ADD COLUMN isp TEXT;
+      ALTER TABLE sessions ADD COLUMN asn TEXT;
+    `);
+  },
 ];
 
 export function runMigrations(db) {

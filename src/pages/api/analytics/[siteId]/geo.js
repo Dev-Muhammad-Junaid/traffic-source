@@ -86,7 +86,8 @@ export default withAuth(async function handler(req, res) {
     const ips = await sessQ(
       `site_id = ? AND datetime(started_at) BETWEEN ? AND ? AND ip IS NOT NULL AND ip != ''`,
       [siteId, range.from, dateEnd],
-      `SELECT ip as name, MAX(country) as country, COUNT(*) as count`,
+      `SELECT ip as name, MAX(country) as country, MAX(city) as city, MAX(region) as region,
+              MAX(isp) as isp, MAX(asn) as asn, MAX(timezone) as timezone, COUNT(*) as count`,
       `GROUP BY ip ORDER BY MAX(started_at) DESC LIMIT 30`
     );
     const browsers = await sessQ(
