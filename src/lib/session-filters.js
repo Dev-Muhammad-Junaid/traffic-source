@@ -9,6 +9,8 @@
  * Matches BankSheet ops rules (site 3 Monday briefs):
  * - Pakistan sessions (country = PK) — founder/internal
  * - session id `smokesid1` (literal smoke-test id)
+ * - session id `muutdr4n98011b6g3` (2026-10-05 browser smoke)
+ * - session id LIKE `smoketest%` (curl/ops smoke prefix)
  * - referrers from 127.0.0.1 or localhost (local dev)
  *
  * Pass exclude_internal=1 (or omit on site_id=3 where APIs default it on).
@@ -31,6 +33,8 @@ export function buildInternalExclusion(alias = '') {
   const clauses = [
     `COALESCE(${pfx}country, '') != 'PK'`,
     `${pfx}id != 'smokesid1'`,
+    `${pfx}id != 'muutdr4n98011b6g3'`,
+    `${pfx}id NOT LIKE 'smoketest%'`,
     `COALESCE(${pfx}referrer, '') NOT LIKE '%127.0.0.1%'`,
     `COALESCE(${pfx}referrer, '') NOT LIKE '%localhost%'`,
     `COALESCE(${pfx}referrer_domain, '') NOT LIKE '%127.0.0.1%'`,
