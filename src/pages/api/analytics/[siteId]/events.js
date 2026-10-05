@@ -19,8 +19,9 @@ export default withAuth(async function handler(req, res) {
 
     // Events inherit whatever session filters the dashboard has active, so the
     // panel stays consistent with the rest of the page when drilling in.
-    const sf = buildSessionFilters(req.query, 's');
-    const useFilters = hasSessionFilters(req.query) && sf.clauses.length > 0;
+    const sf = buildSessionFilters(req.query, 's', { siteId });
+    const useFilters = hasSessionFilters(req.query, siteId) && sf.clauses.length > 0;
+    // Internal exclusion and other session filters require joining sessions.
     const join = useFilters ? 'INNER JOIN sessions s ON s.id = e.session_id' : '';
     const where = useFilters ? ' AND ' + sf.clauses.join(' AND ') : '';
     const params = [siteId, range.from, dateEnd, ...(useFilters ? sf.params : [])];

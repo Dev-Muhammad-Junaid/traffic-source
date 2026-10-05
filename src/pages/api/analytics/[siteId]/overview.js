@@ -34,13 +34,13 @@ export default withAuth(async function handler(req, res) {
     to: new Date(fromDate.getTime() - 86400000).toISOString().slice(0, 10),
   };
 
-  const sf = buildSessionFilters(req.query);
-  const sfAliased = buildSessionFilters(req.query, 's');
+  const sf = buildSessionFilters(req.query, '', { siteId });
+  const sfAliased = buildSessionFilters(req.query, 's', { siteId });
   // Keep the full-period chart visible when drilling into a single day
-  const sfChartAliased = buildSessionFilters(req.query, 's', { excludeDate: true });
+  const sfChartAliased = buildSessionFilters(req.query, 's', { excludeDate: true, siteId });
   const pvf = buildPageViewFilters(req.query);
-  const useSessionFilters = hasSessionFilters(req.query);
-  const useChartSessionFilters = hasNonDateSessionFilters(req.query) || !!req.query.page;
+  const useSessionFilters = hasSessionFilters(req.query, siteId);
+  const useChartSessionFilters = hasNonDateSessionFilters(req.query, siteId) || !!req.query.page;
   const usePageFilter = !!req.query.page;
 
   const sfWhere = sf.clauses.length > 0 ? ' AND ' + sf.clauses.join(' AND ') : '';

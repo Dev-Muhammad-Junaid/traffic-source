@@ -24,8 +24,8 @@ export default withAuth(async function handler(req, res) {
     const db = await getDb();
     const range = parseDateRange(req.query);
     const dateEnd = range.to + ' 23:59:59';
-    const sf = buildSessionFilters(req.query);
-    const sfAliased = buildSessionFilters(req.query, 's');
+    const sf = buildSessionFilters(req.query, '', { siteId });
+    const sfAliased = buildSessionFilters(req.query, 's', { siteId });
     const pvf = buildPageViewFilters(req.query);
     const sfWhere = sf.clauses.length > 0 ? ' AND ' + sf.clauses.join(' AND ') : '';
     const sfAliasedWhere = sfAliased.clauses.length > 0 ? ' AND ' + sfAliased.clauses.join(' AND ') : '';
