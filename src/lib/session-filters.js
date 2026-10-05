@@ -2,10 +2,52 @@
  * Shared session filter builders for analytics API routes.
  */
 
-export function buildSessionFilters(query, alias = '', { excludeDate = false } = {}) {
+
+/**
+ * Internal / QA traffic exclusion for reporting (raw rows stay in D1).
+ *
+ * Matches BankSheet ops rules (site 3 Monday briefs):
+ * - Pakistan sessions (country = PK) — founder/internal
+ * - session id `smokesid1` (literal smoke-test id)
+ * - referrers from 127.0.0.1 or localhost (local dev)
+ *
+ * Pass exclude_internal=1 (or omit on site_id=3 where APIs default it on).
+ * Pass exclude_internal=0 to include internal rows.
+ */
+export function wantsExcludeInternal(query, siteId) {
+  const raw = query && query.exclude_internal;
+  if (raw === '0' || raw === 'false' || raw === 'no') return false;
+  if (raw === '1' || raw === 'true' || raw === 'yes') return true;
+  // BankSheet (site 3): default ON so E5/E3 metrics are not inflated by PK/smoke/localhost.
+  return String(siteId) === '3';
+}
+
+/**
+ * SQL fragments that drop internal sessions. Alias is the sessions table alias
+ * ('' or 's'). Referrer checks cover both sessions.referrer and referrer_domain.
+ */
+export function buildInternalExclusion(alias = '') {
+  const pfx = alias ? `${alias}.` : '';
+  const clauses = [
+    `COALESCE(${pfx}country, '') != 'PK'`,
+    `${pfx}id != 'smokesid1'`,
+    `COALESCE(${pfx}referrer, '') NOT LIKE '%127.0.0.1%'`,
+    `COALESCE(${pfx}referrer, '') NOT LIKE '%localhost%'`,
+    `COALESCE(${pfx}referrer_domain, '') NOT LIKE '%127.0.0.1%'`,
+    `COALESCE(${pfx}referrer_domain, '') NOT LIKE '%localhost%'`,
+  ];
+  return { clauses, params: [] };
+}
+
+export function buildSessionFilters(query, alias = '', { excludeDate = false, siteId = null } = {}) {
   const pfx = alias ? `${alias}.` : '';
   const clauses = [];
   const params = [];
+
+  if (wantsExcludeInternal(query, siteId ?? query.siteId)) {
+    const internal = buildInternalExclusion(alias);
+    clauses.push(...internal.clauses);
+  }
 
   if (query.date && !excludeDate) {
     const day = String(query.date);
@@ -69,7 +111,7 @@ export function buildPageViewFilters(query) {
   return { clauses, params };
 }
 
-export function hasSessionFilters(query) {
+export function hasSessionFilters(query, siteId = null) {
   return !!(
     query.date ||
     query.channel ||
@@ -79,11 +121,12 @@ export function hasSessionFilters(query) {
     query.exit_page ||
     query.browser ||
     query.os ||
-    query.device
+    query.device ||
+    wantsExcludeInternal(query, siteId ?? query.siteId)
   );
 }
 
-export function hasNonDateSessionFilters(query) {
+export function hasNonDateSessionFilters(query, siteId = null) {
   return !!(
     query.channel ||
     query.country ||
@@ -92,7 +135,8 @@ export function hasNonDateSessionFilters(query) {
     query.exit_page ||
     query.browser ||
     query.os ||
-    query.device
+    query.device ||
+    wantsExcludeInternal(query, siteId ?? query.siteId)
   );
 }
 
