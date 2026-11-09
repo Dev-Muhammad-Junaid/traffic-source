@@ -54,15 +54,25 @@ export async function clearBingApiKey() {
 export function explainBingError(message) {
   const text = String(message || '');
   if (text.includes('ThrottleIP') || text.includes('Throttle')) {
-    return 'Bing is rate-limiting this server (ThrottleIP). Too many API calls were made in a short time. Wait about 15 minutes, then use Sync now.';
+    return 'Bing is rate-limiting this server (ThrottleIP). Requests from this host are being refused. Try Sync now again later; if it keeps failing, Bing calls have to run outside this server. Saving the API key again will not fix it.';
   }
   return text.slice(0, 500);
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Bing answers in well under a second. A call that hangs must end as an error
+// we can record, not as a background task the Worker silently cancels.
+const BING_TIMEOUT_MS = 15000;
 
+/**
+ * Call one Bing Webmaster API method.
+ *
+ * No in-request retry on ThrottleIP. Bing throttles Cloudflare's shared egress
+ * IPs, so waiting 20s and then 40s rarely helps, and it pushes a ctx.waitUntil()
+ * sync past the Worker's ~30s post-response budget. The isolate is then killed
+ * after the row was marked syncing and before any error is written. Fail fast,
+ * let the caller store last_error, and leave the retry to the next cron run.
+ * Error text must not include the request URL: the API key is a query param.
+ */
 export async function bingGet(method, params = {}) {
   const apiKey = params.apikey || await getBingApiKey();
   if (!apiKey) throw new Error('Bing Webmaster API key is not configured');
@@ -73,20 +83,23 @@ export async function bingGet(method, params = {}) {
     url.searchParams.set(key, String(value));
   }
 
-  let lastMessage = `Bing ${method} failed`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && !data.ErrorCode) {
-      const rows = data.d;
-      return Array.isArray(rows) ? rows : [];
+  let res;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(BING_TIMEOUT_MS) });
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw new Error(`Bing ${method} did not answer within ${BING_TIMEOUT_MS / 1000}s`);
     }
-    lastMessage = data.Message || `Bing ${method} failed (${res.status})`;
-    const throttled = String(lastMessage).includes('Throttle');
-    if (!throttled || attempt === 2) break;
-    await wait(20000 * (attempt + 1));
+    const detail = String(err?.message || err).replaceAll(apiKey, '[redacted]');
+    throw new Error(`Bing ${method} request failed: ${detail}`);
   }
-  throw new Error(explainBingError(lastMessage));
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && !data.ErrorCode) {
+    const rows = data.d;
+    return Array.isArray(rows) ? rows : [];
+  }
+  const message = data.Message || `Bing ${method} failed (${res.status})`;
+  throw new Error(explainBingError(String(message).replaceAll(apiKey, '[redacted]')));
 }
 
 export async function listBingSites(apiKey) {
