@@ -2,6 +2,17 @@ import { getDb } from './db';
 import { bingGet, explainBingError, getBingApiKey, hostOf, listBingSites, parseBingDate } from './bing';
 
 const STALE_SYNC_MINUTES = 20;
+const BETWEEN_CALLS_MS = 1500;
+const BETWEEN_SITES_MS = 2000;
+// One site used to be able to outlive ctx.waitUntil (~30s after the response)
+// and die while status was still 'syncing'. Keep the whole site inside that
+// window, including the write that records success or the error.
+export const SITE_SYNC_BUDGET_MS = 26000;
+// Manual Sync now and Settings → sync run in waitUntil. The daily cron does not.
+export const BACKGROUND_RUN_BUDGET_MS = 25000;
+// Scheduled handlers are killed at 15 minutes of wall time.
+export const CRON_RUN_BUDGET_MS = 13 * 60 * 1000;
+const MIN_SITE_START_MS = 8000;
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,7 +75,7 @@ async function recordLinkError(db, message, userId = null) {
   return text;
 }
 
-export async function syncBingSite(siteId) {
+export async function syncBingSite(siteId, { budgetMs = SITE_SYNC_BUDGET_MS } = {}) {
   const db = await getDb();
   const link = await db.prepare('SELECT * FROM bing_site_links WHERE site_id = ?').get(siteId);
   if (!link) return { skipped: true, reason: 'not linked' };
@@ -90,16 +101,32 @@ export async function syncBingSite(siteId) {
     return { error: text };
   };
 
+  const started = Date.now();
+  const siteBudget = Number.isFinite(budgetMs) ? budgetMs : SITE_SYNC_BUDGET_MS;
+  const remaining = () => siteBudget - (Date.now() - started);
+  const pull = (method) => {
+    const timeoutMs = Math.min(15000, remaining() - 1000);
+    if (timeoutMs < 1000) {
+      throw new Error('Bing sync stopped before the Worker time limit so the failure could be saved');
+    }
+    return bingGet(method, { siteUrl: link.bing_url }, timeoutMs);
+  };
+  const pause = async (ms) => {
+    if (remaining() < ms + 2000) {
+      throw new Error('Bing sync stopped before the Worker time limit so the failure could be saved');
+    }
+    await wait(ms);
+  };
+
   let traffic, queries, pages, crawl;
   try {
-    const siteUrl = link.bing_url;
-    traffic = await bingGet('GetRankAndTrafficStats', { siteUrl });
-    await wait(1500);
-    queries = await bingGet('GetQueryStats', { siteUrl });
-    await wait(1500);
-    pages = await bingGet('GetPageStats', { siteUrl });
-    await wait(1500);
-    crawl = await bingGet('GetCrawlStats', { siteUrl });
+    traffic = await pull('GetRankAndTrafficStats');
+    await pause(BETWEEN_CALLS_MS);
+    queries = await pull('GetQueryStats');
+    await pause(BETWEEN_CALLS_MS);
+    pages = await pull('GetPageStats');
+    await pause(BETWEEN_CALLS_MS);
+    crawl = await pull('GetCrawlStats');
   } catch (err) {
     return fail(err.message);
   }
@@ -172,7 +199,21 @@ export async function syncBingSite(siteId) {
   };
 }
 
-export async function syncAllBing({ maxAgeHours = 20, force = false, userId = null } = {}) {
+function shouldStopRun(message, stopOnTimeout) {
+  const text = String(message || '');
+  if (text.includes('Throttle')) return true;
+  if (!stopOnTimeout) return false;
+  return text.includes('did not answer within') || text.includes('Worker time limit');
+}
+
+export async function syncAllBing({
+  maxAgeHours = 20,
+  force = false,
+  userId = null,
+  budgetMs = BACKGROUND_RUN_BUDGET_MS,
+  stopOnTimeout = true,
+} = {}) {
+  const started = Date.now();
   const db = await getDb();
   if (!(await getBingApiKey())) {
     await recordLinkError(db, NO_KEY_MESSAGE, userId);
@@ -200,8 +241,8 @@ export async function syncAllBing({ maxAgeHours = 20, force = false, userId = nu
   const skipped = [];
   for (const link of links) {
     if (link.status === 'syncing' && link.sync_started_at) {
-      const started = Date.now() - new Date(link.sync_started_at.replace(' ', 'T') + 'Z').getTime();
-      if (started < STALE_SYNC_MINUTES * 60 * 1000) {
+      const elapsed = Date.now() - new Date(link.sync_started_at.replace(' ', 'T') + 'Z').getTime();
+      if (elapsed < STALE_SYNC_MINUTES * 60 * 1000) {
         skipped.push({ siteId: link.site_id, reason: 'in progress' });
         continue;
       }
@@ -213,15 +254,30 @@ export async function syncAllBing({ maxAgeHours = 20, force = false, userId = nu
         continue;
       }
     }
-    try {
-      const result = await syncBingSite(link.site_id);
-      results.push({ siteId: link.site_id, ...result });
-      if (String(result.error || '').includes('Throttle')) break;
-    } catch (err) {
-      results.push({ siteId: link.site_id, error: err.message });
-      if (String(err.message || '').includes('Throttle')) break;
+    const left = budgetMs - (Date.now() - started);
+    if (left < MIN_SITE_START_MS) {
+      skipped.push({ siteId: link.site_id, reason: 'time limit' });
+      continue;
     }
-    await wait(2000);
+    try {
+      const result = await syncBingSite(link.site_id, {
+        budgetMs: Math.min(SITE_SYNC_BUDGET_MS, left - 1000),
+      });
+      results.push({ siteId: link.site_id, ...result });
+      if (shouldStopRun(result.error, stopOnTimeout)) break;
+    } catch (err) {
+      const text = explainBingError(err?.message || err);
+      try {
+        await db.prepare(
+          "UPDATE bing_site_links SET status = 'error', last_error = ? WHERE site_id = ?"
+        ).run(text, link.site_id);
+      } catch (writeErr) {
+        console.error('Could not record Bing link error:', writeErr?.message || writeErr);
+      }
+      results.push({ siteId: link.site_id, error: text });
+      if (shouldStopRun(text, stopOnTimeout)) break;
+    }
+    await wait(BETWEEN_SITES_MS);
   }
   return { synced: results.length, results, skipped };
 }
