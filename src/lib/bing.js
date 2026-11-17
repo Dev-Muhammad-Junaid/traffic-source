@@ -51,19 +51,52 @@ export async function clearBingApiKey() {
   await db.prepare("DELETE FROM app_settings WHERE key = 'bing_api_key'").run();
 }
 
+/**
+ * The API key is a query param, so any error text that echoes the request URL
+ * has to lose both the raw key and its percent-encoded form.
+ */
+export function redactBingSecret(text, apiKey, requestUrl) {
+  let out = String(text ?? '');
+  if (requestUrl) {
+    const href = typeof requestUrl === 'string' ? requestUrl : requestUrl.href;
+    if (href) out = out.replaceAll(href, '[redacted-url]');
+    const search = typeof requestUrl.search === 'string' ? requestUrl.search : '';
+    if (search.length > 1) out = out.replaceAll(search, '');
+  }
+  if (apiKey) {
+    const encoded = encodeURIComponent(apiKey);
+    for (const secret of [apiKey, encoded, encoded.replace(/%20/g, '+')]) {
+      if (secret) out = out.replaceAll(secret, '[redacted]');
+    }
+  }
+  return out.replace(/([?&]apikey=)[^&\s'"]+/gi, '$1[redacted]');
+}
+
 export function explainBingError(message) {
-  const text = String(message || '');
+  const text = redactBingSecret(message);
   if (text.includes('ThrottleIP') || text.includes('Throttle')) {
-    return 'Bing is rate-limiting this server (ThrottleIP). Too many API calls were made in a short time. Wait about 15 minutes, then use Sync now.';
+    return 'Bing is rate-limiting this server (ThrottleIP). Requests from this host are being refused. Try Sync now again later; if it keeps failing, Bing calls have to run outside this server. Saving the API key again will not fix it.';
   }
   return text.slice(0, 500);
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Bing answers in well under a second. A call that hangs must end as an error
+// we can record, not as a background task the Worker silently cancels.
+const BING_TIMEOUT_MS = 15000;
 
-export async function bingGet(method, params = {}) {
+/**
+ * Call one Bing Webmaster API method.
+ *
+ * No in-request retry on ThrottleIP. Bing throttles Cloudflare's shared egress
+ * IPs, so waiting 20s and then 40s rarely helps, and it pushes a ctx.waitUntil()
+ * sync past the Worker's ~30s post-response budget. The isolate is then killed
+ * after the row was marked syncing and before any error is written. Fail fast,
+ * let the caller store last_error, and leave the retry to the next cron run.
+ * Error text must not include the request URL: the API key is a query param.
+ * Timeout errors use a fixed sentence. Some runtimes put that URL in the
+ * thrown message, and copying it would log the key.
+ */
+export async function bingGet(method, params = {}, timeoutMs = BING_TIMEOUT_MS) {
   const apiKey = params.apikey || await getBingApiKey();
   if (!apiKey) throw new Error('Bing Webmaster API key is not configured');
   const url = new URL(`${BASE}/${method}`);
@@ -73,20 +106,27 @@ export async function bingGet(method, params = {}) {
     url.searchParams.set(key, String(value));
   }
 
-  let lastMessage = `Bing ${method} failed`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && !data.ErrorCode) {
-      const rows = data.d;
-      return Array.isArray(rows) ? rows : [];
+  const requested = Number.isFinite(timeoutMs) ? Math.floor(timeoutMs) : BING_TIMEOUT_MS;
+  const limit = Math.min(BING_TIMEOUT_MS, Math.max(1000, requested));
+
+  let res;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(limit) });
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      const seconds = Math.max(1, Math.round(limit / 1000));
+      throw new Error(`Bing ${method} did not answer within ${seconds}s`);
     }
-    lastMessage = data.Message || `Bing ${method} failed (${res.status})`;
-    const throttled = String(lastMessage).includes('Throttle');
-    if (!throttled || attempt === 2) break;
-    await wait(20000 * (attempt + 1));
+    const detail = redactBingSecret(err?.message || err, apiKey, url);
+    throw new Error(explainBingError(`Bing ${method} request failed: ${detail}`));
   }
-  throw new Error(explainBingError(lastMessage));
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && !data.ErrorCode) {
+    const rows = data.d;
+    return Array.isArray(rows) ? rows : [];
+  }
+  const message = data.Message || `Bing ${method} failed (${res.status})`;
+  throw new Error(explainBingError(redactBingSecret(message, apiKey, url)));
 }
 
 export async function listBingSites(apiKey) {
